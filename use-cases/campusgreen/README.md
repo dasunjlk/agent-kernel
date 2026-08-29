@@ -100,19 +100,27 @@ call, so a single build can run against any data snapshot without re-installing.
 ## Run tests
 
 ```bash
-uv run pytest -s
+uv run pytest -q
 ```
 
-Deterministic tests (agent construction, instructions, configuration, demo boot, and one unit test
-for every tool and validation rule, including the lookup -> create -> notify chain, plus the
-offline WhatsApp routing/session/error and tool-workflow tests) always run. Conversational tests use
-the Agent Kernel test harness and call a real LLM (OpenAI), so they are skipped unless
-`OPENAI_API_KEY` is set. On platforms without the Unix `readline` module (Windows), CLI-driven tests
-are also skipped.
+The Phase 5 reliability suite is **221 tests: 208 pass, 13 skip** on this machine
+(~8.5 s), built in two honest tiers:
 
-Conversational and WhatsApp-integration tests run against isolated copies of the data files (via
-`CAMPUSGREEN_DATA_DIR`), so the committed seed data is never mutated. The WhatsApp tests need no
-credentials at all and call neither Meta nor the OpenAI API.
+- **Tier 1 — deterministic (200 tests):** everything is testable without a key or
+  network — the real WhatsApp handler routing, the real six tools, the real JSON
+  data layer, per-sender session isolation, the SPEC §13 lifecycle state machine,
+  analytics, notification truthfulness, data-integrity, security/hygiene, and an
+  11-step end-to-end competition scenario that finishes with a persisted-state
+  audit. See `EVALUATION.md` for the scenario matrix.
+- **Tier 2 — LLM-dependent (13 gated tests):** conversational tests via the Agent
+  Kernel test harness plus two real prompt-injection probes. They run when
+  `OPENAPI_API_KEY` is set on a platform with the Unix `readline` module (not stock
+  Windows), and are strictly skipped otherwise.
+
+All tests run against isolated copies of the data files (via `CAMPUSGREEN_DATA_DIR`
+and a re-seeded fixture), so the committed seed data is never mutated. The WhatsApp
+tests need no credentials and call neither Meta nor the OpenAI API. Full evidence,
+per-file coverage, and known limitations are in [`TEST_REPORT.md`](TEST_REPORT.md).
 
 ## Project Layout
 
@@ -126,6 +134,15 @@ credentials at all and call neither Meta nor the OpenAI API.
 - `integration_demo.py` — local WhatsApp demo (same routing, no Meta credentials).
 - `integration_test.py` — offline tests of the WhatsApp routing/session/error boundary and tool workflows.
 - `INTEGRATION.md` — how the WhatsApp integration is wired, run, and tested.
+- `tool_test.py` — 100-test unit matrix over all six tools (incl. the lifecycle state machine).
+- `agent_behavior_test.py` — 21 deterministic agent-behavior tests (tools called, truthfulness, isolation).
+- `data_integrity_test.py` — 16 seed-data cross-reference/taxonomy integrity tests.
+- `security_test.py` — 16 secret-scan / input-boundary / log-sanitization tests (incl. 2 gated LLM probes).
+- `e2e_scenario_test.py` — the 11-step end-to-end competition scenario with a disk audit.
+- `test_helpers.py` / `conftest.py` — shared offline harness + isolated-data fixtures.
+- `TEST_REPORT.md` — reliability & testing evidence report (Phases 5).
+- `DEMO.md` — how to run each demo surface.
+- `EVALUATION.md` — evaluator scenario matrix mapped to the tests that prove each row.
 - `data/` — seed locations, teams, issues, and sustainability trends.
 - `SPEC.md` — product specification (source of truth for later phases).
 
@@ -133,5 +150,9 @@ credentials at all and call neither Meta nor the OpenAI API.
 
 The core agent and tool architecture is implemented: six tools, a local data layer, tool-chaining
 workflows, the CLI-only demo, and a WhatsApp messaging integration served through Agent Kernel's
-native `AgentWhatsAppRequestHandler`. Deployment, a web dashboard, analytics platforms, multi-agent
+native `AgentWhatsAppRequestHandler`. **Phase 5 (reliability & competition readiness)** hardened the
+runtime — input coercion, SPEC §13 lifecycle enforcement, structured diagnostic logging, truthful
+failure reporting, refusal of override/injection attempts, and config validation — and packaged the
+whole thing as a runnable 221-test suite described in
+[`TEST_REPORT.md`](TEST_REPORT.md). Deployment, a web dashboard, analytics platforms, multi-agent
 architecture, and advanced memory workflows are intentionally deferred to later phases.

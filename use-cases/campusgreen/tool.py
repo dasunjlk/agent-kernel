@@ -19,20 +19,39 @@ tests to isolate runs from the committed seed data).
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import uuid
 from datetime import datetime, timezone
+from functools import wraps
 from pathlib import Path
 from typing import Any
 
 from agentkernel.core import ToolContext
+
+logger = logging.getLogger("ak.campusgreen.tools")
 
 CATEGORIES = ["WATER", "ENERGY", "WASTE", "FOOD", "POLLUTION", "INFRASTRUCTURE", "OTHER"]
 
 PRIORITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
 
 STATUSES = ["REPORTED", "ASSIGNED", "IN_PROGRESS", "ESCALATED", "RESOLVED", "CLOSED"]
+
+# Minimum lifecycle validation required by SPEC.md section 13: issues move
+# forward through the diagram REPORTED -> ASSIGNED -> IN_PROGRESS -> ESCALATED
+# -> RESOLVED -> CLOSED, escalation is allowed from any still-active status,
+# RESOLVED only closes, and CLOSED is terminal. Transitions outside this set
+# are rejected with invalid_transition. Identical-status updates are no-ops
+# and are not affected.
+ALLOWED_TRANSITIONS: dict[str, set[str]] = {
+    "REPORTED": {"ASSIGNED", "IN_PROGRESS", "ESCALATED", "RESOLVED"},
+    "ASSIGNED": {"IN_PROGRESS", "ESCALATED", "RESOLVED"},
+    "IN_PROGRESS": {"ESCALATED", "RESOLVED"},
+    "ESCALATED": {"IN_PROGRESS", "RESOLVED"},
+    "RESOLVED": {"CLOSED"},
+    "CLOSED": set(),
+}
 
 PERIODS = ["week", "month", "quarter", "all"]
 
@@ -172,6 +191,66 @@ def _error(error: str, message: str, **extra: Any) -> dict[str, Any]:
     return {"status": "error", "error": error, "message": message, **extra}
 
 
+def _coerce_str(value: Any) -> str:
+    """Return a plain string for any tool argument without crashing.
+
+    Tool inputs come from an LLM and are normally strings, but defensive
+    validation matters: a non-string value must produce a structured error
+    result, never an AttributeError or a corrupted record.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    return str(value)
+
+
+def _logged(func: Any) -> Any:
+    """Emit a one-line, non-sensitive trace for every tool call.
+
+    The line records the tool name, the envelope outcome, and a few safe
+    identifiers (issue ID, team ID, location display name, error code). It
+    never logs credentials, API keys, webhook secrets, or free-text user
+    content such as issue descriptions.
+    """
+
+    @wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        try:
+            result = func(*args, **kwargs)
+        except Exception as exc:  # observed by the framework; log the type only
+            try:
+                logger.error("tool=%s status=error exception=%s", func.__name__, type(exc).__name__)
+            except Exception:
+                pass
+            raise
+        try:
+            if isinstance(result, dict):
+                status = str(result.get("status", "unknown"))
+                parts = [f"tool={func.__name__}", f"status={status}"]
+                if status == "ok":
+                    issue = result.get("issue")
+                    issue_id = result.get("issue_id") or (issue.get("issue_id") if isinstance(issue, dict) else None)
+                    if issue_id:
+                        parts.append(f"issue_id={issue_id}")
+                    if result.get("team_id"):
+                        parts.append(f"team={result['team_id']}")
+                    if result.get("notification_type"):
+                        parts.append(f"notification_type={result['notification_type']}")
+                    if isinstance(result.get("location"), str):
+                        parts.append(f"location={result['location']}")
+                    if result.get("period"):
+                        parts.append(f"period={result['period']}")
+                elif result.get("error"):
+                    parts.append(f"error={result['error']}")
+                logger.info(" ".join(parts))
+        except Exception:
+            pass
+        return result
+
+    return wrapper
+
+
 def _location_by_id(location_id: str) -> dict[str, Any] | None:
     needle = (location_id or "").strip().lower()
     for location in _load_json("locations.json"):
@@ -239,8 +318,8 @@ def _channel() -> str:
     return os.environ.get("CAMPUSGREEN_CHANNEL", "cli")
 
 
-def _validate_issue_id(raw: str) -> str | None:
-    value = (raw or "").strip()
+def _validate_issue_id(raw: Any) -> str | None:
+    value = _coerce_str(raw).strip()
     if not value:
         return None
     return value.upper() if re.fullmatch(ISSUE_ID_RE, value.upper()) else None
@@ -271,6 +350,7 @@ def _present_issue(issue: dict[str, Any]) -> dict[str, Any]:
 # --- Tools ------------------------------------------------------------------
 
 
+@_logged
 def lookup_campus_location(query: str) -> dict:
     """Resolve a place name the user mentioned to a known campus location.
 
@@ -280,7 +360,7 @@ def lookup_campus_location(query: str) -> dict:
     responsible team) or a location_not_found error. Never invent a location
     when this tool says a place is unknown; ask the user instead.
     """
-    text = (query or "").strip()
+    text = _coerce_str(query).strip()
     if not text:
         return _error("empty_query", "No location text was provided.")
     needle = text.lower()
@@ -305,12 +385,13 @@ def lookup_campus_location(query: str) -> dict:
     return _error("location_not_found", f"No known campus location matches '{text}'.")
 
 
+@_logged
 def create_issue(
     category: str,
     description: str,
     location_id: str,
     priority: str,
-    reported_by: str = "student",
+    reported_by: str = "",
     source_channel: str = "cli",
 ) -> dict:
     """Create a new sustainability issue record.
@@ -320,30 +401,34 @@ def create_issue(
     The tool generates the issue ID (e.g. WTR-001) itself. Returns a success
     envelope with the created issue (lifecycle status under ``issue["status"]``)
     or an error. Only claim a ticket was created when this returns ok.
+
+    ``reported_by`` defaults to the acting user when the channel provides one,
+    otherwise to "student". ``source_channel`` defaults to the configured
+    CampusGreen channel (``CAMPUSGREEN_CHANNEL`` or ``cli``).
     """
-    normalized_category = (category or "").strip().upper()
+    normalized_category = _coerce_str(category).strip().upper()
     if normalized_category not in CATEGORIES:
         return _error(
             "invalid_category",
             f"Unknown category '{category}'. Allowed categories: {', '.join(CATEGORIES)}.",
         )
-    normalized_priority = (priority or "").strip().upper()
+    normalized_priority = _coerce_str(priority).strip().upper()
     if normalized_priority not in PRIORITIES:
         return _error(
             "invalid_priority", f"Unknown priority '{priority}'. Allowed priorities: {', '.join(PRIORITIES)}."
         )
-    location = _location_by_id(location_id)
+    location = _location_by_id(_coerce_str(location_id))
     if location is None:
         return _error(
             "unknown_location",
             f"No known campus location matches location_id '{location_id}'. Resolve the location first with lookup_campus_location.",
         )
-    text = (description or "").strip()
+    text = _coerce_str(description).strip()
     if not text:
         return _error("missing_description", "A non-empty issue description is required.")
 
-    reporter = (reported_by or "").strip() or _acting_user() or "student"
-    channel = (source_channel or "").strip() or _channel()
+    reporter = _coerce_str(reported_by).strip() or _acting_user() or "student"
+    channel = _coerce_str(source_channel).strip() or _channel()
 
     store = _issue_store()
     now = _utcnow()
@@ -377,6 +462,7 @@ def create_issue(
     }
 
 
+@_logged
 def get_issue(issue_id: str) -> dict:
     """Retrieve a stored issue by its ID (e.g. WTR-001).
 
@@ -394,6 +480,7 @@ def get_issue(issue_id: str) -> dict:
     return {"status": "ok", "issue": _present_issue(issue)}
 
 
+@_logged
 def update_issue(
     issue_id: str,
     priority: str | None = None,
@@ -406,8 +493,10 @@ def update_issue(
     Use for follow-ups such as escalation, progress, resolution, or added
     detail. ``issue_id`` is required and the issue must exist; provide at least
     one field to change. Status must be a lifecycle value and priority one of
-    LOW/MEDIUM/HIGH/CRITICAL. Returns the updated issue state only when the
-    update succeeded; never claim an update or escalation without this ok.
+    LOW/MEDIUM/HIGH/CRITICAL. Lifecycle moves must follow the SPEC section 13
+    state diagram (for example CLOSED is terminal); invalid moves are rejected
+    with an invalid_transition error. Returns the updated issue state only when
+    the update succeeded; never claim an update or escalation without this ok.
     """
     normalized = _validate_issue_id(issue_id)
     if normalized is None:
@@ -415,7 +504,7 @@ def update_issue(
 
     normalized_priority = None
     if priority is not None:
-        normalized_priority = (priority or "").strip().upper()
+        normalized_priority = _coerce_str(priority).strip().upper()
         if normalized_priority not in PRIORITIES:
             return _error(
                 "invalid_priority", f"Unknown priority '{priority}'. Allowed priorities: {', '.join(PRIORITIES)}."
@@ -423,18 +512,35 @@ def update_issue(
 
     normalized_status = None
     if status is not None:
-        normalized_status = (status or "").strip().upper()
+        normalized_status = _coerce_str(status).strip().upper()
         if normalized_status not in STATUSES:
             return _error("invalid_status", f"Unknown status '{status}'. Allowed statuses: {', '.join(STATUSES)}.")
 
     if (
         normalized_priority is None
         and normalized_status is None
-        and not (additional_note or "").strip()
-        and not (resolution_note or "").strip()
+        and not _coerce_str(additional_note).strip()
+        and not _coerce_str(resolution_note).strip()
     ):
         return _error(
             "no_changes", "Provide at least one field to update: priority, status, additional_note, or resolution_note."
+        )
+
+    current = _issue_store().get(normalized)
+    if current is None:
+        return _error("issue_not_found", f"No issue with ID '{normalized}' exists.")
+
+    current_status = str(current.get("status", "")).upper()
+    if (
+        normalized_status is not None
+        and normalized_status != current_status
+        and normalized_status not in ALLOWED_TRANSITIONS.get(current_status, set())
+    ):
+        allowed = sorted(ALLOWED_TRANSITIONS.get(current_status, set()))
+        return _error(
+            "invalid_transition",
+            f"Cannot move issue from status '{current_status}' to '{normalized_status}'. "
+            f"Allowed moves: {', '.join(allowed) if allowed else 'none (terminal status)'}.",
         )
 
     updated = _issue_store().update(
@@ -461,6 +567,7 @@ def update_issue(
     }
 
 
+@_logged
 def notify_team(team_id: str, issue_id: str, message: str = "", notification_type: str = "update") -> dict:
     """Notify a campus team about an issue via the local mock channel.
 
@@ -469,7 +576,7 @@ def notify_team(team_id: str, issue_id: str, message: str = "", notification_typ
     envelope with a notification_id and delivered=True only when delivery was
     recorded. Never claim a team was notified without this ok result.
     """
-    team = _team_by_id(team_id)
+    team = _team_by_id(_coerce_str(team_id))
     if team is None:
         return _error("unknown_team", f"No campus team matches team_id '{team_id}'.")
     normalized = _validate_issue_id(issue_id)
@@ -478,7 +585,7 @@ def notify_team(team_id: str, issue_id: str, message: str = "", notification_typ
     issue = _issue_store().get(normalized)
     if issue is None:
         return _error("unknown_issue", f"No issue with ID '{normalized}' exists.")
-    ntype = (notification_type or "update").strip()
+    ntype = _coerce_str(notification_type).strip() or "update"
     if ntype not in NOTIFICATION_TYPES:
         return _error(
             "invalid_notification_type",
@@ -486,7 +593,7 @@ def notify_team(team_id: str, issue_id: str, message: str = "", notification_typ
         )
 
     now = _utcnow()
-    text = (message or "").strip() or f"{issue['category']} issue {issue['issue_id']}: {issue['description']}"
+    text = _coerce_str(message).strip() or f"{issue['category']} issue {issue['issue_id']}: {issue['description']}"
     record = {
         "notification_id": f"NOT-{uuid.uuid4().hex[:8].upper()}",
         "team_id": team["team_id"],
@@ -517,14 +624,21 @@ def _cutoff_for(period: str) -> str:
 def _compiled_trends(top_category: str | None, top_count: int) -> list[str]:
     trends: list[str] = []
     if top_category:
-        payload = _load_json("sustainability.json")
-        sentence = (payload.get("trends") or {}).get(top_category)
+        sentence = None
+        try:
+            payload = _load_json("sustainability.json")
+            sentence = (payload.get("trends") or {}).get(top_category)
+        except (OSError, json.JSONDecodeError, AttributeError, TypeError):
+            # Missing or malformed qualitative data must not break the report;
+            # the computed counts below are always available.
+            sentence = None
         if sentence:
-            trends.append(sentence)
+            trends.append(str(sentence))
         trends.append(f"{top_category} leads the recorded issue counts this period with {top_count} issue(s).")
     return trends
 
 
+@_logged
 def get_sustainability_report(
     period: str = "month", category: str | None = None, location_id: str | None = None
 ) -> dict:
@@ -536,19 +650,19 @@ def get_sustainability_report(
     narrow the computation. Returns a success envelope with category and
     priority counts, the open issue count, top locations, and notable trends.
     """
-    period_key = (period or "month").strip().lower()
+    period_key = _coerce_str(period).strip().lower() or "month"
     if period_key not in PERIODS:
         return _error("invalid_period", f"Unknown period '{period}'. Allowed periods: {', '.join(PERIODS)}.")
 
     normalized_category = None
     if category is not None:
-        normalized_category = (category or "").strip().upper()
+        normalized_category = _coerce_str(category).strip().upper()
         if normalized_category not in CATEGORIES:
             return _error(
                 "invalid_category", f"Unknown category '{category}'. Allowed categories: {', '.join(CATEGORIES)}."
             )
 
-    if location_id is not None and _location_by_id(location_id) is None:
+    if location_id is not None and _location_by_id(_coerce_str(location_id)) is None:
         return _error("unknown_location_id", f"No campus location matches location_id '{location_id}'.")
 
     issues = _issue_store().all()
@@ -558,7 +672,7 @@ def get_sustainability_report(
     if normalized_category is not None:
         issues = [item for item in issues if item.get("category") == normalized_category]
     if location_id is not None:
-        needle = (location_id or "").strip().lower()
+        needle = _coerce_str(location_id).strip().lower()
         issues = [item for item in issues if str(item.get("location_id", "")).lower() == needle]
 
     category_counts: dict[str, int] = {cat: 0 for cat in CATEGORIES}
