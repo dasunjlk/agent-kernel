@@ -5,7 +5,7 @@ description = "Agent Kernel CLI agent for coordinating campus sustainability iss
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "agentkernel[cli,openai]>=0.8.1",
+    "agentkernel[cli,openai,whatsapp,api]>=0.8.1",
 ]
 
 [dependency-groups]

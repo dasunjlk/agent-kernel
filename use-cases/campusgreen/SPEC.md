@@ -694,7 +694,7 @@ User asks for sustainability summary
 
 ## 16. Messaging Integration
 
-CampusGreen should be channel-independent at the agent and tool layer.
+CampusGreen is channel-independent at the agent and tool layer.
 
 Required interfaces for the full MVP:
 
@@ -713,12 +713,33 @@ User
   -> User response
 ```
 
-Implementation expectations for later phases:
+Implementation expectations:
 
 - The local demo and messaging integration must use the same agent and tool logic.
 - Messaging-specific parsing should stay at the channel boundary.
 - The core CampusGreen tools must not depend on WhatsApp or Slack-specific objects.
 - If messaging credentials are unavailable, the local demo must still show the complete agentic workflow.
+
+### Status (Phase 4)
+
+WhatsApp is implemented as the user-facing messaging integration, served through Agent Kernel's
+native `AgentWhatsAppRequestHandler` (the same handler that backs the `ak-py` examples API).
+
+- `server.py` mounts the handler via `RESTAPI.run` and serves real Meta webhooks at
+  `/whatsapp/webhook`; the handler routes each message into the `campusgreen` agent with
+  `session_id = sender number` (per-user session isolation), and the agent's reply is sent back
+  through WhatsApp.
+- `integration_demo.py` reuses the identical routing but overrides the handler's `_send_message`
+  to print locally, so the complete agentic workflow is demonstrable with **no Meta credentials**
+  and no public tunnel; an `OPENAI_API_KEY` is the only external dependency.
+- `integration_test.py` verifies the boundary offline: message routing, session isolation between
+  senders, reply delivery, missing-agent and runtime-error mapping, unsupported-message rejection,
+  and the full tool workflows (report, unknown location, status, escalation, truthful failure).
+- `config.yaml` sets `whatsapp.agent: "campusgreen"`; credentials are environment-driven
+  (`AK_WHATSAPP__*`). See `INTEGRATION.md` and `README.md` for setup and runtime details.
+- If Meta credentials are unavailable, the local CLI demo (`demo.py`) and the local
+  WhatsApp demo (`integration_demo.py`) both still show the complete workflow, satisfying the
+  last expectation above.
 
 ## 17. Error Handling
 

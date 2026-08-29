@@ -203,6 +203,42 @@ def _remember_active_issue(issue_id: str) -> None:
         pass
 
 
+def _current_session():
+    """Return the active session inside a tool call, or None outside one."""
+    try:
+        return ToolContext.get().session
+    except (AttributeError, RuntimeError):
+        return None
+
+
+def _acting_user() -> str | None:
+    """Return the end user the current request acts on behalf of, if any.
+
+    Agent Kernel publishes the request's ``user_id`` into the session's
+    volatile cache under ``ak.acting_user_id`` when a channel such as WhatsApp
+    provides it, so issue records can be attributed to the real reporter
+    without the agent having to guess.
+    """
+    session = _current_session()
+    if session is None:
+        return None
+    try:
+        value = session.get_volatile_cache().get("ak.acting_user_id")
+    except (AttributeError, RuntimeError):
+        return None
+    return str(value) if value else None
+
+
+def _channel() -> str:
+    """Channel label recorded on new issues.
+
+    Defaults to ``cli`` for the local demo; set ``CAMPUSGREEN_CHANNEL`` to
+    label issues from other surfaces (e.g. ``whatsapp``) without hard-coding a
+    channel name into the agent or tool arguments.
+    """
+    return os.environ.get("CAMPUSGREEN_CHANNEL", "cli")
+
+
 def _validate_issue_id(raw: str) -> str | None:
     value = (raw or "").strip()
     if not value:
@@ -306,6 +342,9 @@ def create_issue(
     if not text:
         return _error("missing_description", "A non-empty issue description is required.")
 
+    reporter = (reported_by or "").strip() or _acting_user() or "student"
+    channel = (source_channel or "").strip() or _channel()
+
     store = _issue_store()
     now = _utcnow()
     issue_id = store.next_issue_id(normalized_category)
@@ -318,8 +357,8 @@ def create_issue(
         "priority": normalized_priority,
         "status": "REPORTED",
         "assigned_team_id": location["responsible_team_id"],
-        "reported_by": reported_by or "student",
-        "source_channel": source_channel or "cli",
+        "reported_by": reporter,
+        "source_channel": channel,
         "created_at": now,
         "updated_at": now,
         "history": [{"timestamp": now, "event": "created", "note": "Initial report created from the user's message."}],
