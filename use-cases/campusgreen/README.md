@@ -4,7 +4,8 @@ CampusGreen is a university sustainability coordinator built on Agent Kernel. A 
 `campusgreen` agent understands campus sustainability reports (water, energy, waste, food,
 pollution, infrastructure), verifies locations, creates and tracks issues, coordinates the
 responsible campus teams, and answers analytics questions — backed by six real Agent Kernel tools
-and a local JSON data layer (Phase 3). The agent never claims a ticket was created or a team was
+and a local JSON data layer (Phase 3), served to end users over **WhatsApp** via Agent Kernel's
+messaging integration (Phase 4). The agent never claims a ticket was created or a team was
 notified unless a tool actually did it.
 
 ## Prerequisites
@@ -37,6 +38,27 @@ What are the biggest sustainability problems this month?
 
 The demo persists issues and notifications to `data/issues.json` as you use it. To reset the data to
 its seeded state, restore the file with `git checkout -- data/issues.json`.
+
+## WhatsApp messaging integration
+
+CampusGreen is also reachable over WhatsApp. The same agent and tools back both the CLI demo and
+the WhatsApp server — only the channel boundary differs.
+
+- **Run it locally with no Meta credentials** (just `OPENAI_API_KEY`):
+
+  ```bash
+  cp .env.example .env   # Windows: copy .env.example .env, then set OPENAI_API_KEY
+  uv run python integration_demo.py
+  ```
+
+- **Run the real server** (needs Meta credentials + a public HTTPS tunnel):
+
+  ```bash
+  uv run python server.py
+  ```
+
+See [`INTEGRATION.md`](INTEGRATION.md) for the full architecture, runtime configuration, and
+offline testing notes.
 
 ## Tools
 
@@ -82,28 +104,34 @@ uv run pytest -s
 ```
 
 Deterministic tests (agent construction, instructions, configuration, demo boot, and one unit test
-for every tool and validation rule, including the lookup -> create -> notify chain) always run.
-Conversational tests use the Agent Kernel test harness and call a real LLM (OpenAI), so they are
-skipped unless `OPENAI_API_KEY` is set. On platforms without the Unix `readline` module
-(Windows), CLI-driven tests are also skipped.
+for every tool and validation rule, including the lookup -> create -> notify chain, plus the
+offline WhatsApp routing/session/error and tool-workflow tests) always run. Conversational tests use
+the Agent Kernel test harness and call a real LLM (OpenAI), so they are skipped unless
+`OPENAI_API_KEY` is set. On platforms without the Unix `readline` module (Windows), CLI-driven tests
+are also skipped.
 
-Conversational tests run against an isolated copy of the data files (via `CAMPUSGREEN_DATA_DIR`),
-so the committed seed data is never mutated.
+Conversational and WhatsApp-integration tests run against isolated copies of the data files (via
+`CAMPUSGREEN_DATA_DIR`), so the committed seed data is never mutated. The WhatsApp tests need no
+credentials at all and call neither Meta nor the OpenAI API.
 
 ## Project Layout
 
 - `agent.py` — the `campusgreen` agent definition and system instructions (tools bound via `OpenAIToolBuilder`).
 - `tool.py` — the six Agent Kernel tools and the local JSON data layer.
 - `demo.py` — Agent Kernel CLI entry point that registers the agent.
-- `config.yaml` — Agent Kernel local configuration (in-memory sessions, logging).
+- `config.yaml` — Agent Kernel local configuration (in-memory sessions, logging, WhatsApp agent name).
 - `test-config.yaml` — Agent Kernel test harness configuration.
 - `demo_test.py` — deterministic tool/agent unit tests, conversational tests, and the tool-chaining integration test.
+- `server.py` — WhatsApp entry point (real Meta webhooks via `AgentWhatsAppRequestHandler`).
+- `integration_demo.py` — local WhatsApp demo (same routing, no Meta credentials).
+- `integration_test.py` — offline tests of the WhatsApp routing/session/error boundary and tool workflows.
+- `INTEGRATION.md` — how the WhatsApp integration is wired, run, and tested.
 - `data/` — seed locations, teams, issues, and sustainability trends.
 - `SPEC.md` — product specification (source of truth for later phases).
 
 ## Scope of This Phase
 
 The core agent and tool architecture is implemented: six tools, a local data layer, tool-chaining
-workflows, and the CLI-only demo. Messaging integrations, deployment, a web dashboard, analytics
-platforms, multi-agent architecture, and advanced memory workflows are intentionally deferred to
-later phases.
+workflows, the CLI-only demo, and a WhatsApp messaging integration served through Agent Kernel's
+native `AgentWhatsAppRequestHandler`. Deployment, a web dashboard, analytics platforms, multi-agent
+architecture, and advanced memory workflows are intentionally deferred to later phases.
