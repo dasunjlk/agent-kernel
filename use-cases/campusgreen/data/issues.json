@@ -1,0 +1,245 @@
+{
+  "issues": [
+    {
+      "issue_id": "WTR-001",
+      "category": "WATER",
+      "location_id": "loc_lab_3",
+      "description": "Water leak outside Lab 3",
+      "priority": "HIGH",
+      "status": "REPORTED",
+      "assigned_team_id": "team_facilities_zone_b",
+      "reported_by": "seed-demo",
+      "source_channel": "cli",
+      "created_at": "2026-08-05T09:15:00Z",
+      "updated_at": "2026-08-05T09:15:00Z",
+      "history": [
+        {
+          "timestamp": "2026-08-05T09:15:00Z",
+          "event": "created",
+          "note": "Initial report seeded for the prototype demo."
+        }
+      ]
+    },
+    {
+      "issue_id": "WTR-002",
+      "category": "WATER",
+      "location_id": "loc_main_library",
+      "description": "Dripping tap in the Main Library restroom",
+      "priority": "MEDIUM",
+      "status": "REPORTED",
+      "assigned_team_id": "team_facilities_zone_a",
+      "reported_by": "seed-demo",
+      "source_channel": "cli",
+      "created_at": "2026-08-12T13:40:00Z",
+      "updated_at": "2026-08-12T13:40:00Z",
+      "history": [
+        {
+          "timestamp": "2026-08-12T13:40:00Z",
+          "event": "created",
+          "note": "Initial report seeded for the prototype demo."
+        }
+      ]
+    },
+    {
+      "issue_id": "ENE-001",
+      "category": "ENERGY",
+      "location_id": "loc_lab_4",
+      "description": "Lights left on overnight in Lab 4",
+      "priority": "MEDIUM",
+      "status": "REPORTED",
+      "assigned_team_id": "team_facilities_zone_b",
+      "reported_by": "seed-demo",
+      "source_channel": "cli",
+      "created_at": "2026-08-07T08:05:00Z",
+      "updated_at": "2026-08-07T08:05:00Z",
+      "history": [
+        {
+          "timestamp": "2026-08-07T08:05:00Z",
+          "event": "created",
+          "note": "Initial report seeded for the prototype demo."
+        }
+      ]
+    },
+    {
+      "issue_id": "ENE-002",
+      "category": "ENERGY",
+      "location_id": "loc_solar_array",
+      "description": "Solar array showing reduced output, likely a panel fault",
+      "priority": "HIGH",
+      "status": "IN_PROGRESS",
+      "assigned_team_id": "team_energy",
+      "reported_by": "seed-demo",
+      "source_channel": "cli",
+      "created_at": "2026-08-10T11:30:00Z",
+      "updated_at": "2026-08-15T16:20:00Z",
+      "history": [
+        {
+          "timestamp": "2026-08-10T11:30:00Z",
+          "event": "created",
+          "note": "Initial report seeded for the prototype demo."
+        },
+        {
+          "timestamp": "2026-08-15T16:20:00Z",
+          "event": "status_changed",
+          "note": "Energy & Utilities began troubleshooting the array."
+        }
+      ]
+    },
+    {
+      "issue_id": "ENE-003",
+      "category": "ENERGY",
+      "location_id": "loc_physics_wing",
+      "description": "Corridor lighting running during daylight hours in the Physics Wing",
+      "priority": "MEDIUM",
+      "status": "ASSIGNED",
+      "assigned_team_id": "team_facilities_zone_b",
+      "reported_by": "seed-demo",
+      "source_channel": "cli",
+      "created_at": "2026-08-15T14:00:00Z",
+      "updated_at": "2026-08-18T09:45:00Z",
+      "history": [
+        {
+          "timestamp": "2026-08-15T14:00:00Z",
+          "event": "created",
+          "note": "Initial report seeded for the prototype demo."
+        },
+        {
+          "timestamp": "2026-08-18T09:45:00Z",
+          "event": "assigned",
+          "note": "Assigned to Facilities Zone B."
+        }
+      ]
+    },
+    {
+      "issue_id": "WST-001",
+      "category": "WASTE",
+      "location_id": "loc_student_cafe",
+      "description": "Overflowing bins near the Student Cafe entrance",
+      "priority": "MEDIUM",
+      "status": "ASSIGNED",
+      "assigned_team_id": "team_catering",
+      "reported_by": "seed-demo",
+      "source_channel": "cli",
+      "created_at": "2026-08-08T18:10:00Z",
+      "updated_at": "2026-08-11T10:00:00Z",
+      "history": [
+        {
+          "timestamp": "2026-08-08T18:10:00Z",
+          "event": "created",
+          "note": "Initial report seeded for the prototype demo."
+        },
+        {
+          "timestamp": "2026-08-11T10:00:00Z",
+          "event": "assigned",
+          "note": "Catering Services scheduled bin collection."
+        }
+      ]
+    },
+    {
+      "issue_id": "WST-002",
+      "category": "WASTE",
+      "location_id": "loc_central_plaza",
+      "description": "Litter scattered around the Central Plaza recycling banks",
+      "priority": "LOW",
+      "status": "REPORTED",
+      "assigned_team_id": "team_grounds",
+      "reported_by": "seed-demo",
+      "source_channel": "cli",
+      "created_at": "2026-08-14T09:30:00Z",
+      "updated_at": "2026-08-14T09:30:00Z",
+      "history": [
+        {
+          "timestamp": "2026-08-14T09:30:00Z",
+          "event": "created",
+          "note": "Initial report seeded for the prototype demo."
+        }
+      ]
+    },
+    {
+      "issue_id": "FOD-001",
+      "category": "FOOD",
+      "location_id": "loc_student_cafe",
+      "description": "Unsold prepared meals discarded at the Student Cafe",
+      "priority": "MEDIUM",
+      "status": "REPORTED",
+      "assigned_team_id": "team_catering",
+      "reported_by": "seed-demo",
+      "source_channel": "cli",
+      "created_at": "2026-08-11T12:20:00Z",
+      "updated_at": "2026-08-11T12:20:00Z",
+      "history": [
+        {
+          "timestamp": "2026-08-11T12:20:00Z",
+          "event": "created",
+          "note": "Initial report seeded for the prototype demo."
+        }
+      ]
+    },
+    {
+      "issue_id": "POL-001",
+      "category": "POLLUTION",
+      "location_id": "loc_north_gate",
+      "description": "Smoke and burning smell near the North Gate",
+      "priority": "HIGH",
+      "status": "ESCALATED",
+      "assigned_team_id": "team_grounds",
+      "reported_by": "seed-demo",
+      "source_channel": "cli",
+      "created_at": "2026-08-09T17:05:00Z",
+      "updated_at": "2026-08-09T17:50:00Z",
+      "history": [
+        {
+          "timestamp": "2026-08-09T17:05:00Z",
+          "event": "created",
+          "note": "Initial report seeded for the prototype demo."
+        },
+        {
+          "timestamp": "2026-08-09T17:50:00Z",
+          "event": "escalated",
+          "note": "Escalated to high priority given the burning smell."
+        }
+      ]
+    },
+    {
+      "issue_id": "INF-001",
+      "category": "INFRASTRUCTURE",
+      "location_id": "loc_solar_array",
+      "description": "Damaged mounting bracket on a solar panel",
+      "priority": "MEDIUM",
+      "status": "REPORTED",
+      "assigned_team_id": "team_energy",
+      "reported_by": "seed-demo",
+      "source_channel": "cli",
+      "created_at": "2026-08-13T10:25:00Z",
+      "updated_at": "2026-08-13T10:25:00Z",
+      "history": [
+        {
+          "timestamp": "2026-08-13T10:25:00Z",
+          "event": "created",
+          "note": "Initial report seeded for the prototype demo."
+        }
+      ]
+    },
+    {
+      "issue_id": "INF-002",
+      "category": "INFRASTRUCTURE",
+      "location_id": "loc_gym_hall",
+      "description": "Cracked floor tile beside the Gym Hall entrance",
+      "priority": "LOW",
+      "status": "REPORTED",
+      "assigned_team_id": "team_facilities_zone_c",
+      "reported_by": "seed-demo",
+      "source_channel": "cli",
+      "created_at": "2026-08-16T15:45:00Z",
+      "updated_at": "2026-08-16T15:45:00Z",
+      "history": [
+        {
+          "timestamp": "2026-08-16T15:45:00Z",
+          "event": "created",
+          "note": "Initial report seeded for the prototype demo."
+        }
+      ]
+    }
+  ],
+  "notifications": []
+}
