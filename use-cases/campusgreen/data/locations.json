@@ -1,0 +1,101 @@
+[
+  {
+    "location_id": "loc_lab_3",
+    "display_name": "Lab 3",
+    "building": "Engineering Block",
+    "floor": "2",
+    "zone": "Zone B",
+    "aliases": ["lab three", "engineering lab 3", "computer lab 3"],
+    "responsible_team_id": "team_facilities_zone_b"
+  },
+  {
+    "location_id": "loc_lab_4",
+    "display_name": "Lab 4",
+    "building": "Engineering Block",
+    "floor": "2",
+    "zone": "Zone B",
+    "aliases": ["lab four", "engineering lab 4"],
+    "responsible_team_id": "team_facilities_zone_b"
+  },
+  {
+    "location_id": "loc_main_library",
+    "display_name": "Main Library",
+    "building": "Library Building",
+    "floor": "1",
+    "zone": "Zone A",
+    "aliases": ["library", "main library building"],
+    "responsible_team_id": "team_facilities_zone_a"
+  },
+  {
+    "location_id": "loc_student_cafe",
+    "display_name": "Student Cafe",
+    "building": "Student Centre",
+    "floor": "1",
+    "zone": "Zone A",
+    "aliases": ["cafe", "cafeteria", "student centre cafe"],
+    "responsible_team_id": "team_catering"
+  },
+  {
+    "location_id": "loc_east_walkway",
+    "display_name": "East Walkway",
+    "building": "Outdoor",
+    "floor": "Ground",
+    "zone": "Zone C",
+    "aliases": ["east walk", "walkway east"],
+    "responsible_team_id": "team_grounds"
+  },
+  {
+    "location_id": "loc_central_plaza",
+    "display_name": "Central Plaza",
+    "building": "Outdoor",
+    "floor": "Ground",
+    "zone": "Zone A",
+    "aliases": ["plaza", "main plaza"],
+    "responsible_team_id": "team_grounds"
+  },
+  {
+    "location_id": "loc_physics_wing",
+    "display_name": "Physics Wing",
+    "building": "Science Building",
+    "floor": "3",
+    "zone": "Zone B",
+    "aliases": ["physics", "science building physics wing"],
+    "responsible_team_id": "team_facilities_zone_b"
+  },
+  {
+    "location_id": "loc_gym_hall",
+    "display_name": "Gym Hall",
+    "building": "Sports Complex",
+    "floor": "1",
+    "zone": "Zone C",
+    "aliases": ["gym", "sports gym"],
+    "responsible_team_id": "team_facilities_zone_c"
+  },
+  {
+    "location_id": "loc_solar_array",
+    "display_name": "Solar Array",
+    "building": "Maintenance Yard",
+    "floor": "Roof",
+    "zone": "Zone C",
+    "aliases": ["solar panels", "solar field"],
+    "responsible_team_id": "team_energy"
+  },
+  {
+    "location_id": "loc_health_centre",
+    "display_name": "Health Centre",
+    "building": "Services Building",
+    "floor": "1",
+    "zone": "Zone A",
+    "aliases": ["clinic", "medical centre"],
+    "responsible_team_id": "team_facilities_zone_a"
+  },
+  {
+    "location_id": "loc_north_gate",
+    "display_name": "North Gate",
+    "building": "Campus Boundary",
+    "floor": "Ground",
+    "zone": "Zone D",
+    "aliases": [],
+    "responsible_team_id": "team_grounds"
+  }
+]

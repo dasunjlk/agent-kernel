@@ -1,0 +1,11 @@
+{
+  "trends": {
+    "WATER": "Water-related reports, such as leaks and dripping taps, are the most common recorded category in this period.",
+    "ENERGY": "Energy waste reports, such as lights left on or faulty solar gear, are the most common recorded category in this period.",
+    "WASTE": "Waste and recycling reports, such as overflowing bins or litter, are the most common recorded category in this period.",
+    "FOOD": "Food waste reports from the cafeteria are the most common recorded category in this period.",
+    "POLLUTION": "Pollution-related reports are the most common recorded category in this period.",
+    "INFRASTRUCTURE": "Infrastructure damage reports are the most common recorded category in this period.",
+    "OTHER": "Miscellaneous sustainability reports are the most common recorded category in this period."
+  }
+}
