@@ -1,0 +1,44 @@
+[
+  {
+    "team_id": "team_facilities_zone_a",
+    "name": "Facilities Zone A",
+    "responsibility": "Maintenance, plumbing, lighting, and infrastructure in Zone A",
+    "zone": "Zone A",
+    "contact_channel": "mock://facilities-zone-a"
+  },
+  {
+    "team_id": "team_facilities_zone_b",
+    "name": "Facilities Zone B",
+    "responsibility": "Maintenance, plumbing, lighting, and infrastructure in Zone B",
+    "zone": "Zone B",
+    "contact_channel": "mock://facilities-zone-b"
+  },
+  {
+    "team_id": "team_facilities_zone_c",
+    "name": "Facilities Zone C",
+    "responsibility": "Maintenance, plumbing, lighting, and infrastructure in Zone C",
+    "zone": "Zone C",
+    "contact_channel": "mock://facilities-zone-c"
+  },
+  {
+    "team_id": "team_catering",
+    "name": "Catering Services",
+    "responsibility": "Cafeteria, food preparation, and food waste coordination",
+    "zone": "Zone A",
+    "contact_channel": "mock://catering"
+  },
+  {
+    "team_id": "team_grounds",
+    "name": "Grounds & Landscape",
+    "responsibility": "Outdoor areas, walkways, drainage, and greening",
+    "zone": "Campus-wide",
+    "contact_channel": "mock://grounds"
+  },
+  {
+    "team_id": "team_energy",
+    "name": "Energy & Utilities",
+    "responsibility": "Solar array, electrical systems, and energy efficiency",
+    "zone": "Campus-wide",
+    "contact_channel": "mock://energy-utilities"
+  }
+]
