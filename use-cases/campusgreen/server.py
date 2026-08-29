@@ -1,9 +1,11 @@
 """CampusGreen WhatsApp server (Agent Kernel messaging integration).
 
 Entry point that serves CampusGreen over WhatsApp through Agent Kernel's native
-``AgentWhatsAppRequestHandler``, mounted on the REST API. Incoming WhatsApp
-webhooks reach the CampusGreen agent (see ``agent.py``) and its tools, and the
-agent's replies are sent back through WhatsApp.
+``AgentWhatsAppRequestHandler`` (wrapped by CampusGreen's thin boundary shim,
+``CampusGreenWhatsAppHandler`` — see ``whatsapp_handler.py``), mounted on the
+REST API. Incoming WhatsApp webhooks reach the CampusGreen agent (see
+``agent.py``) and its tools, and the agent's replies are sent back through
+WhatsApp.
 
 Run from this directory (webhook credentials must be configured, and the server
 needs a public HTTPS URL such as an ngrok or pinggy tunnel to receive WhatsApp's
@@ -28,9 +30,9 @@ import sys
 
 from agentkernel.api import RESTAPI
 from agentkernel.openai import OpenAIModule
-from agentkernel.whatsapp import AgentWhatsAppRequestHandler
 
 from agent import AGENTS
+from whatsapp_handler import CampusGreenWhatsAppHandler
 
 OpenAIModule(AGENTS)
 
@@ -63,7 +65,7 @@ def main() -> None:
             file=sys.stderr,
         )
         raise SystemExit(2)
-    RESTAPI.run([AgentWhatsAppRequestHandler()])
+    RESTAPI.run([CampusGreenWhatsAppHandler()])
 
 
 if __name__ == "__main__":
