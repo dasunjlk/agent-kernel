@@ -99,6 +99,11 @@ SECRET_PATTERNS = [
 def test_no_secrets_in_committed_source():
     offenders = []
     for path in _tracked_campusgreen_files():
+        # The test file itself legitimately contains the secret-matching regex
+        # literals, so it is skipped from the scan (otherwise its own patterns
+        # are a false positive). Every other committed file must be clean.
+        if path.name == "security_test.py":
+            continue
         try:
             content = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):

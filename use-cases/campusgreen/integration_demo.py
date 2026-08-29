@@ -1,10 +1,11 @@
 """Local demo driver for the CampusGreen WhatsApp integration.
 
 This runs the SAME Agent Kernel messaging path as the real ``server.py`` —
-WhatsApp-style webhook payloads routed through ``AgentWhatsAppRequestHandler``
-into the CampusGreen agent and its tools — but intercepts the outbound
-`_send_message` call so it can run locally with **no Meta/WhatsApp
-credentials** and no network access to WhatsApp.
+WhatsApp-style webhook payloads routed through ``CampusGreenWhatsAppHandler``
+(the thin CampusGreen shim over ``AgentWhatsAppRequestHandler``, see
+``whatsapp_handler.py``) into the CampusGreen agent and its tools — but
+intercepts the outbound `_send_message` call so it can run locally with **no
+Meta/WhatsApp credentials** and no network access to WhatsApp.
 
 It demonstrates, end to end:
 
@@ -36,8 +37,9 @@ import os
 import sys
 
 from agentkernel.openai import OpenAIModule
-from agentkernel.whatsapp import AgentWhatsAppRequestHandler
 from fastapi import FastAPI
+
+from whatsapp_handler import CampusGreenWhatsAppHandler
 
 SEQUENCE: list[tuple[str, str]] = [
     ("+15550000001", "There's a water leak outside Lab 3."),
@@ -48,7 +50,7 @@ SEQUENCE: list[tuple[str, str]] = [
 ]
 
 
-class LocalWhatsAppHandler(AgentWhatsAppRequestHandler):
+class LocalWhatsAppHandler(CampusGreenWhatsAppHandler):
     """Handler whose outbound sends are printed locally instead of hitting Meta."""
 
     def __init__(self) -> None:

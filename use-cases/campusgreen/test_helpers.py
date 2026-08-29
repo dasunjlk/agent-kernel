@@ -101,6 +101,32 @@ def new_handler():
     return handler
 
 
+def new_shim_handler():
+    """Construct the CampusGreen WhatsApp shim without running __init__.
+
+    Identical to ``new_handler()`` but builds ``CampusGreenWhatsAppHandler``
+    (the thin normalization + duplicate-event boundary — see
+    ``whatsapp_handler.py``) so the Phase 6 shim's own behavior is testable
+    offline with a scripted ``AgentService`` and an in-memory send recorder.
+    """
+    from whatsapp_handler import CampusGreenWhatsAppHandler
+
+    handler = new_handler()
+    shim = object.__new__(CampusGreenWhatsAppHandler)
+    for attr in ("_log", "_whatsapp_agent", "_whatsapp_agent_acknowledgement", "_max_file_size", "_app_secret"):
+        setattr(shim, attr, getattr(handler, attr))
+    shim.sent = []
+    shim.last_sender = None
+
+    async def fake_send(to_number, text, reply_to_message_id=None):
+        shim.last_sender = to_number
+        shim.sent.append((to_number, text, reply_to_message_id))
+
+    shim._send_message = fake_send
+    shim._seen_message_ids = set()
+    return shim
+
+
 def install_service(service, monkeypatch):
     """Swap the handler's AgentService factory so it yields the given fake."""
     import agentkernel.integration.whatsapp.whatsapp_chat as whatsapp_chat

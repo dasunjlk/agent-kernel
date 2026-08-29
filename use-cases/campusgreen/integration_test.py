@@ -40,6 +40,7 @@ from test_helpers import (
     FakeAgentService,
     install_service,
     new_handler,
+    new_shim_handler,
     reload_issues,
     text_message,
 )
@@ -125,6 +126,78 @@ async def test_audio_message_rejected_before_agent(monkeypatch):
     assert service.selects == []
     assert service.run_calls == []
     assert handler.sent[-1][1] == "Sorry, audio and video messages are not supported yet."
+
+
+# --- Phase 6 boundary shim: normalization + duplicate-event handling ---------
+
+
+@pytest.mark.asyncio
+async def test_whitespace_only_message_is_ignored(monkeypatch):
+    service = FakeAgentService()
+    install_service(service, monkeypatch)
+    handler = new_shim_handler()
+
+    await handler._handle_message(text_message("    "), {})
+    await handler._handle_message(text_message("  \n\t "), {})
+
+    assert service.selects == [], "whitespace-only text must not reach the agent"
+    assert service.run_calls == [], "whitespace-only text must not run the agent"
+    assert handler.sent == [], "an ignored message must produce no reply"
+
+
+@pytest.mark.asyncio
+async def test_empty_text_body_is_ignored(monkeypatch):
+    service = FakeAgentService()
+    install_service(service, monkeypatch)
+    handler = new_shim_handler()
+
+    await handler._handle_message(text_message(""), {})
+
+    assert service.selects == []
+    assert service.run_calls == []
+    assert handler.sent == []
+
+
+@pytest.mark.asyncio
+async def test_text_is_normalized_to_agent(monkeypatch):
+    service = FakeAgentService()
+    install_service(service, monkeypatch)
+    handler = new_shim_handler()
+
+    await handler._handle_message(text_message("  There's a water leak outside Lab 3.  "), {})
+
+    assert len(service.run_calls) == 1
+    requests = service.run_calls[0]
+    assert requests[0].prompt == "There's a water leak outside Lab 3.", "agent must receive the stripped body"
+
+
+@pytest.mark.asyncio
+async def test_duplicate_message_id_processed_once(monkeypatch):
+    service = FakeAgentService(reply="Done")
+    install_service(service, monkeypatch)
+    handler = new_shim_handler()
+
+    first = text_message("There's a water leak outside Lab 3.", message_id="wamid.dup.1")
+    await handler._handle_message(first, {})
+    assert len(service.run_calls) == 1, "the first delivery must be processed"
+
+    duplicate = text_message("There's a water leak outside Lab 3.", message_id="wamid.dup.1")
+    await handler._handle_message(duplicate, {})
+    assert len(service.run_calls) == 1, "a redelivered event with the same ID must be skipped"
+    assert len(handler.sent) == 1, "a redelivered event must not produce a second reply"
+
+
+@pytest.mark.asyncio
+async def test_same_content_distinct_ids_both_processed(monkeypatch):
+    service = FakeAgentService(reply="Done")
+    install_service(service, monkeypatch)
+    handler = new_shim_handler()
+
+    await handler._handle_message(text_message("There's a water leak outside Lab 3.", message_id="wamid.a"), {})
+    await handler._handle_message(text_message("There's a water leak outside Lab 3.", message_id="wamid.b"), {})
+
+    assert len(service.run_calls) == 2, "dedup is by message ID, not content"
+    assert len(handler.sent) == 2, "distinct user-sent messages must each be answered"
 
 
 # --- Tool workflows through the handler (real tools) ---------------------------

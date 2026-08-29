@@ -725,10 +725,14 @@ Implementation expectations:
 WhatsApp is implemented as the user-facing messaging integration, served through Agent Kernel's
 native `AgentWhatsAppRequestHandler` (the same handler that backs the `ak-py` examples API).
 
-- `server.py` mounts the handler via `RESTAPI.run` and serves real Meta webhooks at
-  `/whatsapp/webhook`; the handler routes each message into the `campusgreen` agent with
-  `session_id = sender number` (per-user session isolation), and the agent's reply is sent back
-  through WhatsApp.
+- `server.py` mounts the handler (wrapped by CampusGreen's thin boundary shim,
+  `CampusGreenWhatsAppHandler` in `whatsapp_handler.py`) via `RESTAPI.run` and
+  serves real Meta webhooks at `/whatsapp/webhook`; the handler routes each
+  message into the `campusgreen` agent with `session_id = sender number`
+  (per-user session isolation), and the agent's reply is sent back through
+  WhatsApp. The shim normalizes incoming text (strips whitespace, ignores
+  empty/whitespace-only messages) and skips duplicate platform events by their
+  message ID before delegating to the native handler.
 - `integration_demo.py` reuses the identical routing but overrides the handler's `_send_message`
   to print locally, so the complete agentic workflow is demonstrable with **no Meta credentials**
   and no public tunnel; an `OPENAI_API_KEY` is the only external dependency.
