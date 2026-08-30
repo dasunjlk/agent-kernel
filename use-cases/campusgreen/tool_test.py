@@ -31,6 +31,7 @@ from tool import (
     get_sustainability_report,
     lookup_campus_location,
     notify_team,
+    search_issues,
     update_issue,
 )
 
@@ -388,10 +389,116 @@ def test_report_survives_missing_or_malformed_trends(isolated_store, monkeypatch
     assert any("leads the recorded issue counts" in trend for trend in report["notable_trends"])
 
 
+# --- search_issues -----------------------------------------------------------
+
+
+def test_search_issues_lists_all_and_orders_by_priority_then_recency(isolated_store):
+    result = search_issues()
+    assert result["status"] == "ok"
+    assert result["count"] == 11 and result["total_matches"] == 11
+    ids = [item["issue_id"] for item in result["issues"]]
+    assert set(ids) == {
+        "WTR-001",
+        "WTR-002",
+        "ENE-001",
+        "ENE-002",
+        "ENE-003",
+        "WST-001",
+        "WST-002",
+        "FOD-001",
+        "POL-001",
+        "INF-001",
+        "INF-002",
+    }
+    # Highest priority first; within HIGH, the newer report precedes the older one.
+    assert result["issues"][0]["issue_id"] == "ENE-002"
+    assert result["issues"][1]["issue_id"] == "POL-001"
+
+
+def test_search_issues_filters_by_category_status_and_location(isolated_store):
+    by_category = search_issues(category="WATER")
+    assert by_category["status"] == "ok" and by_category["count"] == 2
+    assert {item["issue_id"] for item in by_category["issues"]} == {"WTR-001", "WTR-002"}
+
+    open_all = search_issues(status="OPEN")
+    assert open_all["count"] == 11
+
+    solar = search_issues(location_id="loc_solar_array")
+    assert {item["issue_id"] for item in solar["issues"]} == {"ENE-002", "INF-001"}
+    assert all(item["location"] == "Solar Array" for item in solar["issues"])
+
+
+def test_search_issues_open_excludes_resolved_and_closed(isolated_store):
+    resolved = create_issue("WATER", "already fixed", "loc_lab_3", "LOW")
+    update_issue(resolved["issue_id"], status="RESOLVED", resolution_note="done")
+    closed = create_issue("ENERGY", "old closed ticket", "loc_lab_4", "LOW")
+    update_issue(closed["issue_id"], status="RESOLVED", resolution_note="done")
+    update_issue(closed["issue_id"], status="CLOSED")
+
+    opened = search_issues(status="OPEN")
+    assert closed["issue_id"] not in {item["issue_id"] for item in opened["issues"]}
+    assert resolved["issue_id"] not in {item["issue_id"] for item in opened["issues"]}
+
+    resolved_list = search_issues(status="RESOLVED")
+    assert resolved["issue_id"] in {item["issue_id"] for item in resolved_list["issues"]}
+    assert closed["issue_id"] not in {item["issue_id"] for item in resolved_list["issues"]}
+
+    closed_list = search_issues(status="CLOSED")
+    assert closed["issue_id"] in {item["issue_id"] for item in closed_list["issues"]}
+
+
+def test_search_issues_filters_are_case_insensitive(isolated_store):
+    upper = search_issues(category="WATER", status="OPEN")
+    lower = search_issues(category="water", status="open")
+    assert upper["status"] == "ok"
+    assert upper["issues"] == lower["issues"]
+
+
+def test_search_issues_limit_caps_results_but_reports_total(isolated_store):
+    result = search_issues(limit=3)
+    assert result["status"] == "ok"
+    assert len(result["issues"]) == 3
+    assert result["count"] == 3
+    assert result["total_matches"] == 11, "total_matches must reflect all matches, not the capped window"
+
+
+def test_search_issues_validation_errors(isolated_store):
+    assert search_issues(category="CLIMATE")["error"] == "invalid_category"
+    assert search_issues(status="BOGUS")["error"] == "invalid_status"
+    assert search_issues(location_id="loc_nowhere")["error"] == "unknown_location_id"
+    assert search_issues(limit=0)["error"] == "invalid_limit"
+    assert search_issues(limit=101)["error"] == "invalid_limit"
+    assert search_issues(limit="many")["error"] == "invalid_limit"
+
+
+def test_search_issues_presenter_excludes_full_history(isolated_store):
+    item = search_issues(limit=1)["issues"][0]
+    for key in (
+        "issue_id",
+        "category",
+        "description",
+        "location",
+        "location_id",
+        "priority",
+        "status",
+        "assigned_team",
+    ):
+        assert key in item
+    assert "history" not in item
+    assert "reported_by" not in item
+
+
+def test_search_issues_empty_match_returns_count_zero(isolated_store):
+    result = search_issues(category="WATER", status="RESOLVED")
+    assert result["status"] == "ok"
+    assert result["count"] == 0 and result["total_matches"] == 0
+    assert result["issues"] == []
+
+
 # --- non-string torture across all tools --------------------------------------
 
 
-@pytest.mark.parametrize("call", ["lookup", "create", "get", "update", "notify", "report"])
+@pytest.mark.parametrize("call", ["lookup", "create", "get", "update", "notify", "report", "search"])
 def test_non_string_inputs_never_raise(isolated_store, call):
     weird = (None, 123, 3.14, True, ["x"], {"a": 1})
     invocations = []
@@ -402,6 +509,7 @@ def test_non_string_inputs_never_raise(isolated_store, call):
         "update": lambda value: update_issue(value, priority=value, status=value, additional_note=value),
         "notify": lambda value: notify_team(value, value, message=value, notification_type=value),
         "report": lambda value: get_sustainability_report(period=value, category=value, location_id=value),
+        "search": lambda value: search_issues(category=value, status=value, location_id=value, limit=value),
     }
     for value in weird:
         result = label[call](value)

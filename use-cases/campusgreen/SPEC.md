@@ -99,6 +99,7 @@ Needs:
 - Category-level counts.
 - Identification of high-impact areas.
 - Reliable data that comes from recorded issues, not fabricated statistics.
+- Concrete, prioritized recommendations about what to work on, grounded in the recorded issues.
 
 ## 6. User Scenarios
 
@@ -269,6 +270,7 @@ The agent is responsible for:
 - Creating, retrieving, and updating issue records through tools.
 - Notifying the responsible team through a tool.
 - Remembering the active issue context during a session.
+- Producing prioritized, evidence-grounded action plans when the user asks what to work on.
 - Explaining outcomes clearly to the user.
 - Avoiding claims that were not confirmed by tool results.
 
@@ -284,6 +286,8 @@ The agent can:
 - Update issue records through the issue tool.
 - Notify responsible teams through the notification tool.
 - Analyze stored issue data through the reporting tool.
+- List the actual recorded issue records (through `search_issues`) when inspecting the data behind a plan or action.
+- Produce action plans and recommendations grounded in the recorded issues.
 - Use session memory to resolve follow-up references.
 
 The agent cannot:
@@ -296,6 +300,8 @@ The agent cannot:
 - Perform emergency dispatch.
 - Promise a repair time unless a tool result provides one.
 - Make policy decisions on behalf of the university.
+- Estimate financial savings, future consumption, or other metrics the recorded data cannot compute.
+- Perform operational actions (escalate, notify) merely because a plan recommended them; it acts only on an explicit user request.
 
 ## 9. Tool Specifications
 
@@ -373,6 +379,41 @@ Failure behavior:
 
 - Return not found when no matching issue exists.
 - The agent must say it could not find the issue and ask for more details if needed.
+
+### `search_issues`
+
+Purpose: List the actual recorded issue records (real ticket IDs, category,
+description, location, priority, status, assigned team) matching optional
+filters, so the agent can inspect the data behind a plan or action.
+
+Input:
+
+- Optional `category`
+- Optional `status`
+- Optional `location_id`
+- Optional `limit` (default 20, max 100)
+
+Semantics:
+
+- `status="OPEN"` means any status other than `RESOLVED` or `CLOSED`.
+- Results are deterministic: priority rank (`CRITICAL` > `HIGH` > `MEDIUM` >
+  `LOW`) first, then most recently created, then by issue ID. This is a
+  documented sort order, not a scoring model.
+- The tool only lists records; it does not rank or recommend. The agent decides
+  what a list means.
+
+Output on success:
+
+- `count` — number of issues returned (capped at `limit`).
+- `total_matches` — number of matching records overall.
+- `issues` — compact per-issue summaries (no full history): `issue_id`,
+  `category`, `description`, `location`, `location_id`, `priority`, `status`,
+  `assigned_team`, `created_at`, `updated_at`.
+
+Failure behavior:
+
+- `invalid_category`, `invalid_status`, `unknown_location_id`, or `invalid_limit`.
+- The agent must not fabricate issue records; an empty result is a truthful result.
 
 ### `update_issue`
 
@@ -692,6 +733,24 @@ User asks for sustainability summary
   -> Agent explains the insight without inventing statistics
 ```
 
+### Action Planning Workflow
+
+```text
+User asks what to prioritize or what to do about a problem
+  -> get_sustainability_report (counts and trends)
+  -> search_issues (the actual open ticket records)
+  -> Agent separates evidence (counts, tickets) from recommendation
+  -> Agent prioritizes by the strongest available evidence (reports recorded,
+     how many are still open, priority levels, recurring locations)
+  -> Agent gives operational, location/team/ticket-specific recommendations
+  -> Agent does NOT act (no update_issue / notify_team) without an explicit request
+  -> Optional: user explicitly asks the agent to act (e.g. "escalate the top
+     issue"); each action is confirmed by its tool result before the agent claims it
+```
+
+Follow-up "why" questions explain the previous plan from the recorded data
+(counts and open status), never from invented rationale.
+
 ## 16. Messaging Integration
 
 CampusGreen is channel-independent at the agent and tool layer.
@@ -838,6 +897,11 @@ Later implementation phases must include tests for:
 - Issue status retrieval.
 - Sustainability report generation from tool-provided data.
 - Reporting failure with no fabricated statistics.
+- `search_issues` filtering (category/status/location), `OPEN` semantics, cap/`total_matches`, and documented sort order.
+- Action plans grounded in recorded evidence (counts plus real ticket lists), with a separate evidence line and a recommendation per item.
+- A plan that performs no operational action (no create/update/notify) until the user explicitly asks.
+- Cost/savings or forecasting questions answered honestly (declined when the data cannot compute them).
+- Escalation on an explicit user request, verified on disk (status, priority, history, notification record).
 - Local CLI or demo flow for the four primary scenarios.
 
 Tests should include both direct tool tests and conversational agent tests. Conversational tests that depend on prior turns should preserve one session ID across the ordered interaction.
@@ -892,10 +956,12 @@ The MVP must include:
 - Campus location lookup.
 - Issue creation.
 - Issue retrieval.
+- Issue listing (`search_issues`).
 - Issue updates.
 - Team notification through a tool.
 - Session/state handling.
 - Sustainability report generation.
+- Action planning from recorded issue data (prioritized, evidence-grounded recommendations).
 - Local demo.
 - One messaging integration, preferably WhatsApp or Slack.
 - Tests.

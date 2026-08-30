@@ -146,12 +146,13 @@ def test_agent_name_is_campusgreen():
     assert campusgreen_agent.name == "campusgreen"
 
 
-def test_agent_binds_all_six_tools():
+def test_agent_binds_all_seven_tools():
     names = {tool.name for tool in campusgreen_agent.tools}
     assert names == {
         "lookup_campus_location",
         "create_issue",
         "get_issue",
+        "search_issues",
         "update_issue",
         "notify_team",
         "get_sustainability_report",
@@ -160,11 +161,12 @@ def test_agent_binds_all_six_tools():
         assert tool.description.strip()
 
 
-def test_tool_module_exports_the_six_tools():
+def test_tool_module_exports_the_seven_tools():
     assert {func.__name__ for func in Tools} == {
         "lookup_campus_location",
         "create_issue",
         "get_issue",
+        "search_issues",
         "update_issue",
         "notify_team",
         "get_sustainability_report",
@@ -194,6 +196,7 @@ def test_instructions_describe_each_tool():
         "lookup_campus_location",
         "create_issue",
         "get_issue",
+        "search_issues",
         "update_issue",
         "notify_team",
         "get_sustainability_report",
@@ -670,6 +673,57 @@ async def test_sustainability_report(test_client):
             "The biggest sustainability problem this month is energy-related, based on recorded issue counts.",
             "Energy reports are the most common sustainability issue this month according to the data.",
         ]
+    )
+
+
+@requires_openai_key
+@cli_unavailable
+@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.order(12)
+async def test_action_plan_grounded_in_recorded_issues(test_client):
+    """An action-plan request must ground priorities in the recorded data.
+
+    The agent runs get_sustainability_report + search_issues and produces a
+    ranked plan; it must not fabricate metrics or promise savings.
+    """
+    response = await test_client.send("What should we prioritize to improve sustainability this month?")
+    lowered = response.lower()
+    assert "priorit" in lowered, f"response should offer a prioritization; got: {response!r}"
+    assert "energ" in lowered, f"ENERGY leads the recorded counts this month; got: {response!r}"
+
+
+@requires_openai_key
+@cli_unavailable
+@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.order(13)
+async def test_plan_escalation_acts_on_explicit_request(isolated_data_dir):
+    """Explicit escalation acts through update + notify and is verifiable on disk.
+
+    The agent must not act on its own plan just because it recommended an
+    action; it executes only when the user explicitly asks, and the persisted
+    issues.json must reflect the escalation (status, priority, notification).
+    """
+    test = Test("demo.py")
+    await test.start()
+    try:
+        response = await test.send("Escalate the top unresolved energy issue.")
+    finally:
+        await test.stop()
+
+    lowered = response.lower()
+    assert "escalat" in lowered, f"response should confirm the escalation; got: {response!r}"
+    assert "energy" in lowered or "utilities" in lowered
+
+    after = json.loads((isolated_data_dir / "issues.json").read_text(encoding="utf-8"))
+    escalated = [
+        item
+        for item in after["issues"]
+        if item["category"] == "ENERGY" and item["status"] == "ESCALATED" and item["priority"] == "CRITICAL"
+    ]
+    assert escalated, "an explicit escalation must persist to an ENERGY ticket on disk"
+    assert any(
+        n["issue_id"] == escalated[0]["issue_id"] and n["notification_type"] == "escalation"
+        for n in after["notifications"]
     )
 
 

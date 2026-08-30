@@ -38,6 +38,7 @@ from tool import (
     get_sustainability_report,
     lookup_campus_location,
     notify_team,
+    search_issues,
     update_issue,
 )
 
@@ -259,6 +260,12 @@ class CampusGreenDriver(FakeAgentService):
         # memory so a follow-up that only supplies the missing location continues
         # the same task instead of starting over.
         self.pending: dict[str, dict] = {}
+        # session_id -> {scope, top_category, ranking, counts, open_counts,
+        # focused_category, issues} for the last action plan produced in this
+        # conversation. Mirrors the LLM carrying the plan in the session's
+        # context so follow-ups ("why is the first the highest priority?") can
+        # explain the previous plan without the user repeating the request.
+        self.last_plan: dict[str, dict[str, Any]] = {}
         self.current_session: str | None = None
 
     def select(self, session_id=None, name=None):
@@ -327,6 +334,218 @@ class CampusGreenDriver(FakeAgentService):
             f"Assigned team: {issue['assigned_team']}"
         )
 
+    # --- Action planning (Phase 8) ---------------------------------------------
+
+    def _recommended_action(self, category: str, count: int, open_issues: list[dict[str, Any]]) -> str:
+        """Deterministic, operational recommendation grounded in the real records.
+
+        Kept deliberately category-specific and operational (locations, tickets,
+        assigned teams), never a generic slogan such as "use less water".
+        """
+        locations = sorted({item["location"] for item in open_issues})
+        places = ", ".join(locations) if locations else "the reported locations"
+        if category == "WATER":
+            base = f"Inspect the water-leak locations ({places}) and prioritize maintenance on the reported leaks."
+        elif category == "ENERGY":
+            base = f"Review the reported energy-waste locations ({places}) and correct the lights/equipment at fault."
+        elif category == "WASTE":
+            base = f"Increase waste and recycling collection frequency at {places}."
+        elif category == "FOOD":
+            base = f"Review food preparation and portions at {places} to reduce avoidable food disposal."
+        elif category == "POLLUTION":
+            base = f"Inspect the source of the reported pollution at {places} and resolve it."
+        elif category == "INFRASTRUCTURE":
+            base = f"Schedule repairs for the damaged sustainability infrastructure at {places}."
+        else:
+            base = f"Review the reported issues at {places} and schedule the appropriate response."
+        if count > 1:
+            base += f" With {count} recorded report(s), this is worth a coordinated follow-up."
+        return base
+
+    def _open_issue_map(self) -> dict[str, Any]:
+        """Return (status, open_issues_by_category, counts, top_locations) from real tools."""
+        report = get_sustainability_report(period="month")
+        if report["status"] != "ok":
+            return {"ok": False}
+        listing = search_issues(status="OPEN")
+        if listing["status"] != "ok":
+            return {"ok": False}
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        for item in listing["issues"]:
+            grouped.setdefault(item["category"], []).append(item)
+        return {
+            "ok": True,
+            "counts": report["category_counts"],
+            "top_locations": report["top_locations"],
+            "open_by_category": grouped,
+            "report": report,
+        }
+
+    def _general_plan(self) -> str:
+        data = self._open_issue_map()
+        if not data["ok"]:
+            return "I could not build a plan right now because the sustainability data is unavailable."
+        counts = data["counts"]
+        open_by_category = data["open_by_category"]
+        if not any(counts.values()):
+            return "There are no recorded sustainability issues for this period yet, so there is nothing to prioritize."
+        categories = [category for category in counts if counts[category] > 0]
+        ranking = sorted(
+            categories,
+            key=lambda category: (-counts[category], -len(open_by_category.get(category, [])), category),
+        )
+        self.last_plan[self.current_session] = {
+            "scope": "general",
+            "top_category": ranking[0] if ranking else None,
+            "ranking": list(ranking),
+            "counts": dict(counts),
+            "open_counts": {category: len(open_by_category.get(category, [])) for category in ranking},
+        }
+        lines = ["Here are the current sustainability priorities, based on the issues recorded this month:"]
+        for index, category in enumerate(ranking[:3], start=1):
+            open_issues = open_by_category.get(category, [])
+            evidence = f"Evidence: {counts[category]} recorded issue(s) this month, " f"{len(open_issues)} still open."
+            for item in open_issues[:3]:
+                evidence += f" {item['issue_id']} ({item['priority']}, {item['status']}, {item['location']})."
+            lines.append(f"\n{index}. {category}\n   {evidence}")
+            lines.append(f"   Recommended action: {self._recommended_action(category, counts[category], open_issues)}")
+        return "\n".join(lines)
+
+    def _focused_plan(self, category: str) -> str:
+        report = get_sustainability_report(period="month", category=category)
+        listing = search_issues(category=category, status="OPEN")
+        if report["status"] != "ok" or listing["status"] != "ok":
+            return f"I could not build a plan for {category.title()} right now because the data is unavailable."
+        count = report["category_counts"].get(category, 0)
+        issues = listing["issues"]
+        self.last_plan[self.current_session] = {
+            "scope": "focused",
+            "focused_category": category,
+            "issues": [dict(item) for item in issues],
+            "count": count,
+        }
+        if count == 0:
+            return (
+                f"There are no recorded {category.title()} issues for this period, so there is nothing to plan around."
+            )
+        lines = [
+            f"Focused on {category.title()}: there {'is' if count == 1 else 'are'} {count} recorded "
+            f"{category.title()} issue(s) this month, {'all still open.' if len(issues) == count else f'{len(issues)} still open.'}"
+        ]
+        for index, item in enumerate(issues[:3], start=1):
+            action = self._recommended_action(category, count, issues)
+            lines.append(
+                f"\n{index}. {item['issue_id']} — {item['priority']}, {item['status']}, {item['location']}.\n"
+                f"   Evidence: {item['description']}"
+                f"\n   Recommended action: {action}"
+            )
+        return "\n".join(lines)
+
+    def _location_plan(self) -> str:
+        data = self._open_issue_map()
+        if not data["ok"]:
+            return "I could not build a location plan right now because the sustainability data is unavailable."
+        counts = data["counts"]
+        if not any(counts.values()):
+            return "There are no recorded sustainability issues for this period, so I cannot rank any locations."
+        top = data["top_locations"]
+        by_id = {}
+        for grouped in data["open_by_category"].values():
+            for item in grouped:
+                by_id.setdefault(item["location_id"], []).append(item)
+        self.last_plan[self.current_session] = {
+            "scope": "locations",
+            "locations": [dict(item) for item in top],
+        }
+        if not top:
+            return "The recorded issues do not associate with any known campus locations, so I cannot prioritize locations."
+        lines = ["Based on this month's records, the campus locations with the most sustainability activity are:"]
+        for index, location in enumerate(top[:5], start=1):
+            location_issues = by_id.get(location["location_id"], [])
+            detail = ", ".join(
+                f"{item['issue_id']} ({item['priority']}, {item['status']})" for item in location_issues[:3]
+            )
+            lines.append(
+                f"\n{index}. {location['display_name']} — {location['count']} recorded issue(s)."
+                f"{(' ' + detail + '.') if detail else ''}"
+            )
+            lines.append(
+                f"   Recommended action: {self._recommended_action('OTHER', location['count'], location_issues)}"
+            )
+        return "\n".join(lines)
+
+    def _escalate_action(self, prompt: str) -> str | None:
+        """Act on an explicit escalation request; returns the reply or None if not an escalation."""
+        lowered = prompt.lower()
+        if "escalate" not in lowered:
+            return None
+        issue = None
+        id_match = re.search(r"\b([A-Z]{3}-\d{3,})\b", prompt.upper())
+        if id_match:
+            result = get_issue(id_match.group(1))
+            if result["status"] == "ok":
+                issue = result["issue"]
+            else:
+                return f"I could not find issue {id_match.group(1)} to escalate. Could you double-check the ticket ID?"
+        else:
+            category = detect_category(prompt)
+            if category is None:
+                return (
+                    "Which issue would you like me to escalate? Give me the ticket ID, "
+                    "or tell me the type of problem (for example the water or energy issue)."
+                )
+            listing = search_issues(category=category, status="OPEN")
+            if listing["status"] != "ok":
+                return "I could not look up the open issues right now."
+            open_issues = listing["issues"]
+            if not open_issues:
+                return (
+                    "I could not find an open issue to escalate"
+                    + (f" for {category}." if category else ".")
+                    + " Could you give me the ticket ID?"
+                )
+            issue = open_issues[0]
+        updated = update_issue(
+            issue["issue_id"],
+            priority="CRITICAL",
+            status="ESCALATED",
+            additional_note="Escalated on the user's explicit request.",
+        )
+        if updated["status"] != "ok":
+            return f"I could not escalate {issue['issue_id']} right now."
+        self._note_issue(issue["issue_id"])
+        notified = notify_team(
+            team_id=updated["issue"]["assigned_team_id"],
+            issue_id=updated["issue"]["issue_id"],
+            notification_type="escalation",
+            message=f"Escalated to Critical on the user's request: ticket {updated['issue']['issue_id']}.",
+        )
+        if notified["status"] == "ok":
+            return (
+                f"Escalated {updated['issue']['issue_id']} to Critical ({issue['status']} -> ESCALATED). "
+                f"The {updated['issue']['assigned_team']} team has been notified."
+            )
+        return (
+            f"Escalated {updated['issue']['issue_id']} to Critical, but the team notification failed. "
+            f"The {updated['issue']['assigned_team']} team could not be notified right now."
+        )
+
+    def _plan_intent(self, lowered: str) -> bool:
+        return any(
+            word in lowered
+            for word in (
+                "prioriti",
+                "prioritize",
+                "recommend",
+                "action plan",
+                "do about",
+                "should we",
+                "what should i",
+                "how should we",
+                "which campus",
+            )
+        )
+
     def _agent_result(self, prompt: str) -> str:
         lowered = prompt.lower()
 
@@ -343,6 +562,55 @@ class CampusGreenDriver(FakeAgentService):
             return "I don't have live meter data. I can summarize the campus issues that were actually recorded, but I can't estimate consumption or costs."
         if "old science" in lowered or "lab 99" in lowered:
             return "I could not find that building in the campus directory. Could you name a building, room, or landmark I know?"
+
+        # --- Action planning (Phase 8) -----------------------------------------
+        # Ordered before analytics and reporting so planning prompts that also
+        # mention "month" or a category resolve as plans, not analytics or new
+        # reports. Analysis branches never perform operational actions; only the
+        # explicit escalation branch acts (update + notify) and only when the
+        # user asked for it.
+        money_intent = "how much" in lowered and any(
+            w in lowered for w in ("money", "save", "saving", "cost", "dollar", "budget")
+        )
+        cost_intent = any(
+            w in lowered
+            for w in ("save by", "will it cost", "how much will", "cost us", "university save", "the university save")
+        )
+        if money_intent or cost_intent:
+            return (
+                "I can't calculate costs or savings from the available data. I can tell you which issues "
+                "were actually recorded and recommend priorities, but I don't have a cost or savings model."
+            )
+
+        escalated = self._escalate_action(prompt)
+        if escalated is not None:
+            return escalated
+
+        if "why" in lowered:
+            plan = self.last_plan.get(self.current_session) or {}
+            top = plan.get("top_category")
+            if top:
+                counts = plan["counts"]
+                open_count = plan.get("open_counts", {}).get(top, 0)
+                return (
+                    f"{top} is the top priority because it has the most recorded issues this period "
+                    f"({counts[top]} report(s)), and {open_count} of them are still open."
+                )
+            focused = plan.get("focused_category")
+            if focused:
+                return (
+                    f"Within {focused.title()}, the plan follows the recorded tickets: higher-priority "
+                    "open issues come first, and every recommended action stays grounded in what was actually reported."
+                )
+            return "Could you tell me which part of the plan you'd like me to explain?"
+
+        if self._plan_intent(lowered):
+            if any(w in lowered for w in ("location", "locations", "where on campus", "which areas", "campus should")):
+                return self._location_plan()
+            category = detect_category(prompt)
+            if category:
+                return self._focused_plan(category)
+            return self._general_plan()
 
         # --- Status / ticket lookup by explicit ID --------------------------
         id_status_intent = any(

@@ -17,6 +17,11 @@ It demonstrates, end to end:
 6. The agent retrieves the issue.
 7. The user reports a worsening condition.
 8. The agent escalates (update + notify).
+9. The user asks for an action plan.
+10. The agent gathers the recorded issues (report + search) and prioritizes.
+11. The user asks why a plan item ranks first; the agent explains the evidence.
+12. The user asks the agent to act on the plan; the agent escalates the top
+    unresolved issue and notifies the responsible team.
 
 Because a second sender number is used, the demo also shows per-user session
 isolation (each WhatsApp sender gets its own CampusGreen session).
@@ -47,6 +52,9 @@ SEQUENCE: list[tuple[str, str]] = [
     ("+15550000001", "What's the status of WTR-001?"),
     ("+15550000002", "The bins near the Student Cafe are overflowing."),
     ("+15550000001", "What are the biggest sustainability problems this month?"),
+    ("+15550000001", "What should we prioritize to improve sustainability this month?"),
+    ("+15550000001", "Why is ENERGY ranked first?"),
+    ("+15550000001", "Escalate the top unresolved energy issue."),
 ]
 
 

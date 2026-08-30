@@ -36,8 +36,8 @@ Two Agent Kernel mechanisms do the heavy lifting for us:
   extra plumbing on our side.
 - **Same agent + tools as the CLI** — the WhatsApp server registers the exact
   `AGENTS` from `agent.py` via `OpenAIModule`, so everything the CLI demo can do
-  (report, lookup, create, notify, status, escalate, analytics) works over
-  WhatsApp too.
+  (report, lookup, create, notify, status, escalate, analytics, action planning)
+  works over WhatsApp too.
 
 Messages that aren't plain text or an image/document (e.g. audio/video) are
 rejected at the channel boundary by the handler before the agent runs.
@@ -85,10 +85,12 @@ uv run python integration_demo.py
 
 This prints a scripted exchange — a student reports a leak, the agent verifies
 the location, creates the issue, notifies the responsible team, answers a status
-question, escalates a worsening condition, and a second sender's bins complaint
-is handled in its own session. Because the handler intercepts the outbound
-WhatsApp call, **no Meta account or public URL is required**; the only external
-service is the OpenAI API the agent reasons with.
+question, escalates a worsening condition, a second sender's bins complaint is
+handled in its own session, and (as the closing turns) the agent produces an
+evidence-grounded action plan, explains its ranking, and escalates a ticket only
+when explicitly asked. Because the handler intercepts the outbound WhatsApp call,
+**no Meta account or public URL is required**; the only external service is the
+OpenAI API the agent reasons with.
 
 ## Run the real server
 
@@ -165,7 +167,10 @@ drive-the-handler suites: `conversational_flows_test.py` (the per-flow matrix �
 multi-turn clarification, contextual status, multi-issue reference resolution by
 topic, courtesy/no-tool and unsupported-request handling, and retry-after-failure)
 and `flow_scenarios_test.py` (whole cohesive conversations replayed one prompt at a
-time and cross-checked against the persisted `issues.json`). All tests run against an
+time and cross-checked against the persisted `issues.json`). The Phase 8 **action
+planning** suite (`action_planning_test.py`) drives the same handler through
+evidence-grounded plans, "why" follow-ups, analysis-only behavior, explicit
+escalations, and disk audits of the resulting tickets. All tests run against an
 isolated, re-seeded copy of the data (via `test_helpers`/`conftest` and `demo_test`'s
 own temp-data fixture), so the committed `data/issues.json` is never mutated by the
 suite.

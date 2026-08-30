@@ -3,7 +3,7 @@
 How to run each CampusGreen surface, what to expect, and how to reset the data.
 
 CampusGreen has three runnable surfaces. All share the same agent (`agent.py`) and
-the same six tools (`tool.py`); only the channel boundary differs.
+the same seven tools (`tool.py`); only the channel boundary differs.
 
 | Surface | Command | Needs | Opens |
 | --- | --- | --- | --- |
@@ -25,11 +25,16 @@ There's a water leak outside Lab 3.
 What's the status of WTR-001?
 The bins near the Student Cafe are overflowing.
 What are the biggest sustainability problems this month?
+What should we prioritize to improve sustainability this month?
+Why is ENERGY ranked first?
+Escalate the top unresolved energy issue.
 What's the current status?
 ```
 
 Each report verifies the location, creates an issue, notifies the responsible team,
-and can be followed up (status, escalation, re-notify).
+and can be followed up (status, escalation, re-notify). The planning turns show the
+agent prioritizing the recorded issues with evidence and only acting (escalating)
+when explicitly asked.
 
 > **Windows note:** `agentkernel.cli` imports the Unix-only `readline` module, so the
 > CLI demo cannot start on stock Windows. Use the WhatsApp demo below — it exercises
@@ -47,9 +52,11 @@ uv run python integration_demo.py
 Prints a scripted exchange exactly as a real WhatsApp user would see it: a student
 reports a leak (lookup → create → notify), the responsible team is picked up, a
 status question is answered from stored data, a worsening leak is escalated, a second
-sender's bins complaint runs in its own session, and partial failures are reported
-truthfully. Requires **no** Meta account and no tunnel; the only external service is
-the OpenAI API.
+sender's bins complaint runs in its own session, partial failures are reported
+truthfully, and — as the final turns — the agent produces an evidence-grounded
+action plan, explains its ranking, and escalates a ticket only when explicitly asked.
+Requires **no** Meta account and no tunnel; the only external service is the OpenAI
+API.
 
 ## 3. Real WhatsApp server (`server.py`)
 
@@ -97,6 +104,27 @@ CampusGreen: That's outside what I can do. I can report and track sustainability
 Each turn is answered the same way the real product would be, and nothing is ever
 fabricated: every claim about a ticket, team, status, or notification comes from a
 tool result, and polite acknowledgements and refusals make no tool call at all.
+
+Action planning is a conversation of its own, grounded in the recorded issues and
+acted on only when asked:
+
+```text
+Student: What should we prioritize to improve sustainability this month?
+CampusGreen: Here are the current sustainability priorities, based on the issues
+             recorded this month:
+             1. ENERGY — Evidence: 3 recorded issue(s) this month, 3 still open.
+                ENE-002 (HIGH, IN_PROGRESS, Solar Array). Recommended action: …
+Student: Why is ENERGY ranked first?
+CampusGreen: ENERGY is the top priority because it has the most recorded issues this
+             period (3 report(s)), and 3 of them are still open.
+Student: Escalate the top unresolved energy issue.
+CampusGreen: Escalated ENE-002 to Critical (IN_PROGRESS → ESCALATED). The Energy
+             Management team has been notified.
+```
+
+The plan puts the counts and the real ticket list above the recommendation, and the
+agent takes no operational action (no escalations, no notifications) inside the plan
+itself — it waits for the explicit escalation request.
 
 ## 5. Data & reset
 

@@ -48,6 +48,7 @@ async def test_general_question_uses_no_tools(isolated_store, monkeypatch):
         "create_issue",
         "lookup_campus_location",
         "get_issue",
+        "search_issues",
         "update_issue",
         "notify_team",
         "get_sustainability_report",

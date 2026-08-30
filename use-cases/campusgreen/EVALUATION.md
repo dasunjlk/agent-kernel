@@ -1,9 +1,10 @@
-# CampusGreen Evaluation Matrix (Phase 7)
+# CampusGreen Evaluation Matrix (Phase 7 + Phase 8)
 
 A runnable evaluation: every column of the matrix maps a real-user scenario to the
 tests that prove it, so a judge (or another engineer) can replay the evidence
-without taking the document's word for it. Numbers are from the Phase 7 run on
-Windows 11 / Python 3.12.13 / agentkernel 0.8.1 — see [TEST_REPORT.md](TEST_REPORT.md).
+without taking the document's word for it. Numbers are from the Phase 7 + Phase 8
+run on Windows 11 / Python 3.12.13 / agentkernel 0.8.1 — see
+[TEST_REPORT.md](TEST_REPORT.md).
 
 | # | Scenario (user says / experiences) | What it must prove | Proof (file + test) |
 | --- | --- | --- | --- |
@@ -39,10 +40,23 @@ Windows 11 / Python 3.12.13 / agentkernel 0.8.1 — see [TEST_REPORT.md](TEST_RE
 | P7 | **Courtesy / capabilities never waste a tool call** — "Thanks!", "Hello.", "What can you do?" | Natural short reply, no unnecessary tool invocation. | `conversational_flows_test.py::test_courtesy_messages_use_no_tools`, `test_capability_question_uses_no_tools` |
 | P8 | **Retry after failure does not duplicate** — a failed create, then "Please try again." | The agent offers to redo the failed step without re-creating/fabricating an existing ticket. | `conversational_flows_test.py::test_retry_after_failure_does_not_duplicate`; `tool_test.py` `no-write-on-failure` group |
 
+## Phase 8 — sustainability action planning
+
+| # | Scenario (user says / experiences) | What it must prove | Proof (file + test) |
+| --- | --- | --- | --- |
+| AP1 | **Evidence-grounded action plan** — "What should we prioritize to improve sustainability this month?" | Returns a plan built from the recorded store (counts, how many still open, real ticket IDs, locations, priorities); separates evidence from recommendation; makes **no** operational tool call (no create/update/notify) while planning. | `action_planning_test.py::test_general_plan_ranks_top_category_with_evidence`, `test_general_plan_uses_only_data_tools` |
+| AP2 | **Focused / location plans** — "What should we do about our energy use?" and "Which campus location needs attention?" | Recommendations name the responsible team, location, priority, and a concrete operational action for the matching tickets. | `action_planning_test.py::test_focused_plan_is_targeted_at_the_matching_category`, `test_location_plan_picks_top_location` |
+| AP3 | **"Why" follow-up grounded in data** — "Why is ENERGY ranked first?" | The explanation uses recorded counts and open status ("3 report(s), 3 still open"), not invented rationale. | `action_planning_test.py::test_why_follow_up_uses_recorded_counts` |
+| AP4 | **Honest boundaries on un-computable questions** — "How much money would fixing ENERGY save?" | Declines with "I can't calculate costs or savings from the available data" — no fabricated savings figures. | `action_planning_test.py::test_cost_savings_questions_are_declined_honestly` |
+| AP5 | **Truthful empty-data answer** — planning with an empty store | An honest "could not find an open issue" answer; no invented tickets or counts. | `action_planning_test.py::test_empty_data_plan_is_truthful` |
+| AP6 | **Explicit escalation acts — and only then** — plan → "why" → "Escalate the top unresolved energy issue." | The agent plans without acting, then escalates the exact referenced ticket (status, priority, history, notify record) and verifies the change on disk. | `action_planning_test.py::test_plan_then_why_then_act_scenario`, `test_escalation_from_plan_persists_to_disk`; `integration_demo.py` closing SEQUENCE turns |
+| AP7 | **Vague escalation gets clarified, not guessed** — "Escalate something urgent." | Agent asks which issue (or which category) instead of picking arbitrarily. | `action_planning_test.py::test_vague_escalation_request_asks_for_clarification` |
+| AP8 | **`search_issues` under all filters** (category / status / OPEN semantics / location / limit + `total_matches`) | Deterministic listing of real records with `status="OPEN"` = not RESOLVED/CLOSED; documented sort (priority rank, then newest). | `tool_test.py` `search_issues` group (9 tests incl. torture param) |
+
 ## Reading the numbers
 
-- **Tier 1 (rows 1–17 + P1–P8):** every row is verified by passing tests in this repo's
-  `use-cases/campusgreen/`. Run `uv run pytest -q --exitfirst` to replay.
+- **Tier 1 (rows 1–17 + P1–P8 + AP1–AP8):** every row is verified by passing tests
+  in this repo's `use-cases/campusgreen/`. Run `uv run pytest -q --exitfirst` to replay.
 - **Tier 2 (row 18):** guaranteed-skipped on this Windows machine (no
   `OPENAI_API_KEY`, no `readline`), runnable in keyed CI on a POSIX runner. The
   Tier-1 rows pin the same application behavior deterministically, so none of the
@@ -50,7 +64,7 @@ Windows 11 / Python 3.12.13 / agentkernel 0.8.1 — see [TEST_REPORT.md](TEST_RE
 
 ## Verdict
 
-All 24 runnable scenarios pass offline (238 of 251 tests passing, 13 skips are
-exclusively Tier-2 LLM tests). The two Phase-5 decisions that are *known product
+All 32 runnable scenarios pass offline (265 of 280 tests passing; the 15 skips are
+exclusively Tier-2 LLM tests). The Phase-5 decisions that are *known product
 limits* — no deduplication, and no full agent-behavior claim from the deterministic
 tier alone — are stated in [TEST_REPORT.md](TEST_REPORT.md) rather than papered over.

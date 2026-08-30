@@ -36,6 +36,11 @@ CATEGORIES = ["WATER", "ENERGY", "WASTE", "FOOD", "POLLUTION", "INFRASTRUCTURE",
 
 PRIORITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
 
+# Deterministic ordering for issue listings: most severe first, then newest.
+# This is a sort order only — a documented, transparent ordering — not a scoring
+# or prioritization model. The agent decides what a list means.
+PRIORITY_RANK = {priority: index for index, priority in enumerate(PRIORITIES)}
+
 STATUSES = ["REPORTED", "ASSIGNED", "IN_PROGRESS", "ESCALATED", "RESOLVED", "CLOSED"]
 
 # Minimum lifecycle validation required by SPEC.md section 13: issues move
@@ -241,6 +246,8 @@ def _logged(func: Any) -> Any:
                         parts.append(f"location={result['location']}")
                     if result.get("period"):
                         parts.append(f"period={result['period']}")
+                    if result.get("total_matches") is not None:
+                        parts.append(f"count={result['total_matches']}")
                 elif result.get("error"):
                     parts.append(f"error={result['error']}")
                 logger.info(" ".join(parts))
@@ -344,6 +351,30 @@ def _present_issue(issue: dict[str, Any]) -> dict[str, Any]:
         "created_at": issue.get("created_at", ""),
         "updated_at": issue.get("updated_at", ""),
         "history": [dict(entry) for entry in issue.get("history") or []],
+    }
+
+
+def _present_search_issue(issue: dict[str, Any]) -> dict[str, Any]:
+    """Compact listing form for ``search_issues`` (no full history).
+
+    Keeps list payloads token-light while still carrying everything the agent
+    needs to reason about priorities: real ticket ID, category, description,
+    location, priority, status, and assigned team.
+    """
+    location = _location_by_id(issue.get("location_id", ""))
+    team = _team_by_id(issue.get("assigned_team_id", ""))
+    return {
+        "issue_id": issue["issue_id"],
+        "category": issue.get("category", ""),
+        "description": issue.get("description", ""),
+        "location": issue.get("location_display_name")
+        or (location["display_name"] if location else issue.get("location_id", "")),
+        "location_id": issue.get("location_id", ""),
+        "priority": issue.get("priority", ""),
+        "status": issue.get("status", ""),
+        "assigned_team": team["name"] if team else issue.get("assigned_team_id", ""),
+        "created_at": issue.get("created_at", ""),
+        "updated_at": issue.get("updated_at", ""),
     }
 
 
@@ -478,6 +509,99 @@ def get_issue(issue_id: str) -> dict:
     if issue is None:
         return _error("issue_not_found", f"No issue with ID '{normalized}' exists.")
     return {"status": "ok", "issue": _present_issue(issue)}
+
+
+def _created_timestamp(issue: dict[str, Any]) -> float:
+    """Sortable timestamp for an issue's created_at (malformed -> 0)."""
+    raw = str(issue.get("created_at", "")).strip()
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return 0
+    return parsed.timestamp()
+
+
+@_logged
+def search_issues(category: str = "", status: str = "", location_id: str = "", limit: int = 20) -> dict:
+    """List recorded issues matching optional filters (no ranking opinion).
+
+    Use when you need to inspect the actual issue records behind a question:
+    which tickets exist for a category, which are still open, or which belong
+    to a location. Unlike get_sustainability_report (aggregate counts), this
+    returns the individual issue records with real ticket IDs, status,
+    priority, location, and assigned team. Results are ordered by severity
+    then recency (CRITICAL > HIGH > MEDIUM > LOW, newest first). status
+    "OPEN" means not RESOLVED or CLOSED; any other value must be an exact
+    lifecycle status. Returns a success envelope with count, total_matches,
+    and the issues list, or an error for invalid filters.
+    """
+    lowered_category = None
+    if _coerce_str(category).strip():
+        normalized_category = _coerce_str(category).strip().upper()
+        if normalized_category not in CATEGORIES:
+            return _error(
+                "invalid_category", f"Unknown category '{category}'. Allowed categories: {', '.join(CATEGORIES)}."
+            )
+        lowered_category = normalized_category
+
+    lowered_status = None
+    if _coerce_str(status).strip():
+        normalized_status = _coerce_str(status).strip().upper()
+        if normalized_status == "OPEN":
+            lowered_status = "OPEN"
+        elif normalized_status in STATUSES:
+            lowered_status = normalized_status
+        else:
+            return _error(
+                "invalid_status",
+                f"Unknown status '{status}'. Use OPEN, or one of: {', '.join(STATUSES)}.",
+            )
+
+    lowered_location = None
+    if _coerce_str(location_id).strip():
+        location = _location_by_id(_coerce_str(location_id))
+        if location is None:
+            return _error("unknown_location_id", f"No campus location matches location_id '{location_id}'.")
+        lowered_location = location["location_id"].lower()
+
+    raw_limit = _coerce_str(limit).strip() or "20"
+    try:
+        parsed_limit = int(raw_limit)
+    except ValueError:
+        return _error("invalid_limit", "limit must be an integer between 1 and 100.")
+    if parsed_limit < 1 or parsed_limit > 100:
+        return _error("invalid_limit", "limit must be an integer between 1 and 100.")
+
+    matches = []
+    for issue in _issue_store().all():
+        if lowered_category is not None and issue.get("category") != lowered_category:
+            continue
+        if lowered_status is not None:
+            issue_status = str(issue.get("status", "")).upper()
+            if lowered_status == "OPEN":
+                if issue_status in ("RESOLVED", "CLOSED"):
+                    continue
+            elif issue_status != lowered_status:
+                continue
+        if lowered_location is not None and str(issue.get("location_id", "")).lower() != lowered_location:
+            continue
+        matches.append(dict(issue))
+
+    matches.sort(
+        key=lambda item: (
+            -PRIORITY_RANK.get(str(item.get("priority", "")).upper(), 0),
+            -_created_timestamp(item),
+            str(item.get("issue_id", "")),
+        )
+    )
+    total = len(matches)
+    selected = [dict(item) for item in matches[:parsed_limit]]
+    return {
+        "status": "ok",
+        "count": len(selected),
+        "total_matches": total,
+        "issues": [_present_search_issue(item) for item in selected],
+    }
 
 
 @_logged
@@ -721,6 +845,7 @@ Tools = [
     lookup_campus_location,
     create_issue,
     get_issue,
+    search_issues,
     update_issue,
     notify_team,
     get_sustainability_report,

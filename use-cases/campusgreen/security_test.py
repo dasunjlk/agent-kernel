@@ -235,6 +235,7 @@ def _spy_all(monkeypatch, calls: list) -> None:
         "create_issue",
         "lookup_campus_location",
         "get_issue",
+        "search_issues",
         "update_issue",
         "notify_team",
         "get_sustainability_report",

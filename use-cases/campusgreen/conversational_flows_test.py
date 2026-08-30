@@ -227,7 +227,7 @@ async def test_multiple_same_category_issues_ask_when_ambiguous(isolated_store):
 @pytest.mark.asyncio
 async def test_unsupported_request_honestly_declined(isolated_store, monkeypatch):
     calls = []
-    for name in ("create_issue", "lookup_campus_location", "get_issue", "update_issue", "notify_team"):
+    for name in ("create_issue", "lookup_campus_location", "get_issue", "search_issues", "update_issue", "notify_team"):
         _spy_tool(monkeypatch, name, calls)
     driver = CampusGreenDriver()
 
@@ -316,6 +316,7 @@ async def test_courtesy_messages_use_no_tools(isolated_store, monkeypatch):
         "create_issue",
         "lookup_campus_location",
         "get_issue",
+        "search_issues",
         "update_issue",
         "notify_team",
         "get_sustainability_report",
