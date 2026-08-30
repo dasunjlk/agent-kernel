@@ -166,6 +166,43 @@ def known_location_in(prompt: str) -> str | None:
     return None
 
 
+def has_location_signal(prompt: str) -> bool:
+    """True when the prompt appears to name a place, even an unknown one.
+
+    Distinguishes "there's a leak" (no place, missing location) from "water leak
+    near the old building" (a place was named but is not in the campus
+    directory) so the driver asks for a location in the former and reports an
+    unknown location in the latter, mirroring the agent's two behaviours.
+    """
+    lowered = prompt.lower()
+    signals = (
+        "near",
+        "outside",
+        "at the",
+        "at a",
+        "around",
+        "by the",
+        "beside",
+        "in the",
+        "on the",
+        "behind",
+        "next to",
+        "building",
+        "room",
+        "lab",
+        "block",
+        "gate",
+        "wing",
+        "hall",
+        "plaza",
+        "walkway",
+        "cafe",
+        "library",
+        "gym",
+    )
+    return any(signal in lowered for signal in signals)
+
+
 def decide_priority(category: str, prompt: str) -> str:
     """Deterministic priority assessment mirroring SPEC section 12 examples."""
     lowered = prompt.lower()
@@ -211,6 +248,17 @@ class CampusGreenDriver(FakeAgentService):
         super().__init__(agent_truthy=True)
         # session_id -> most recently touched issue id (mirrors session memory)
         self.active: dict[str, str] = {}
+        # session_id -> ordered list of issue ids touched in this conversation
+        # (most recent last). Mirrors the LLM's recall of which issues were
+        # discussed so follow-up references can be resolved by topic instead of
+        # always defaulting to the single most recent issue. The issue records
+        # themselves (get_issue) remain the source of truth.
+        self.recent_issues: dict[str, list[str]] = {}
+        # session_id -> {category, description} for a report awaiting its
+        # location. Mirrors the LLM keeping an in-progress report in its working
+        # memory so a follow-up that only supplies the missing location continues
+        # the same task instead of starting over.
+        self.pending: dict[str, dict] = {}
         self.current_session: str | None = None
 
     def select(self, session_id=None, name=None):
@@ -225,6 +273,53 @@ class CampusGreenDriver(FakeAgentService):
 
     def _reply(self, text: str) -> str:
         return text
+
+    def _note_issue(self, issue_id: str) -> None:
+        """Record that ``issue_id`` was just created/fetched for this session.
+
+        Keeps the conversation's recent-issue recall ordered by recency so a
+        later reference can be resolved to the right ticket even when several
+        issues were discussed.
+        """
+        if not self.current_session:
+            return
+        bucket = self.recent_issues.setdefault(self.current_session, [])
+        if issue_id not in bucket:
+            bucket.append(issue_id)
+        else:
+            bucket.remove(issue_id)
+            bucket.append(issue_id)
+        self.active[self.current_session] = issue_id
+
+    def _issue_id_for_category(self, session_id: str, category: str) -> str | None:
+        """Return the most recently discussed issue of ``category``, if any."""
+        for issue_id in reversed(self.recent_issues.get(session_id) or []):
+            result = get_issue(issue_id)
+            if result["status"] == "ok" and result["issue"].get("category") == category:
+                return issue_id
+        return None
+
+    def _resolve_reference(self, session_id: str, prompt: str) -> str | None:
+        """Resolve a follow-up reference in ``prompt`` to a session issue.
+
+        Prefers a topic match (for example "the leak" -> the WATER issue) over
+        the single most recent issue, and falls back to the most recently
+        discussed issue for generic references ("that issue", "the previous
+        report"). Returns None when nothing can be resolved so the agent can
+        ask for clarification instead of guessing.
+        """
+        lowered = prompt.lower()
+        for category in ("WATER", "WASTE", "ENERGY", "FOOD", "POLLUTION", "INFRASTRUCTURE"):
+            if detect_category(prompt) == category:
+                matched = self._issue_id_for_category(session_id, category)
+                if matched:
+                    return matched
+        if any(
+            word in lowered
+            for word in ("that issue", "the previous", "the report", "ticket i just", "the ticket", "the report")
+        ):
+            return self.recent_issues.get(session_id, [None])[-1]
+        return self.active.get(session_id)
 
     def _status_summary(self, issue: dict[str, Any]) -> str:
         return (
@@ -250,20 +345,43 @@ class CampusGreenDriver(FakeAgentService):
             return "I could not find that building in the campus directory. Could you name a building, room, or landmark I know?"
 
         # --- Status / ticket lookup by explicit ID --------------------------
+        id_status_intent = any(
+            word in lowered
+            for word in (
+                "status",
+                "ticket",
+                "check",
+                "how is",
+                "update",
+                "happening",
+                "resolved",
+                "going on",
+                "current",
+                "about the",
+            )
+        )
         id_match = re.search(r"\b([A-Z]{3}-\d{3,})\b", prompt.upper())
-        if id_match and any(word in lowered for word in ("status", "ticket", "check", "how is", "update")):
+        if id_match and id_status_intent:
             result = get_issue(id_match.group(1))
             if result["status"] == "ok":
-                self.active[self.current_session] = result["issue"]["issue_id"]
+                self._note_issue(result["issue"]["issue_id"])
                 return self._status_summary(result["issue"])
             return f"I could not find issue {id_match.group(1)}. If you have a ticket ID please double-check it, or describe what you reported and where."
 
-        # --- Status request without an ID (resolves to session's issue) ------
-        if "status" in lowered:
-            active = self.active.get(self.current_session)
-            if active:
-                result = get_issue(active)
+        # --- Status request without an ID (resolves topic references, else active)
+        # A narrower intent set: without an explicit ID, words like "ticket",
+        # "update", "current", or "about the" alone are not a standalone status
+        # question (e.g. "and create the ticket immediately"), so they are not
+        # treated as a status lookup here.
+        status_intent = any(
+            word in lowered for word in ("status", "check", "how is", "happening", "resolved", "going on")
+        )
+        if status_intent:
+            target = self._resolve_reference(self.current_session, prompt)
+            if target:
+                result = get_issue(target)
                 if result["status"] == "ok":
+                    self._note_issue(result["issue"]["issue_id"])
                     return self._status_summary(result["issue"])
             return "I need to know which issue you mean. Could you give me the ticket ID?"
 
@@ -288,7 +406,7 @@ class CampusGreenDriver(FakeAgentService):
                 category="WATER", description=prompt, location_id=lookup["location"]["location_id"], priority="HIGH"
             )
             issue_id = created["issue_id"]
-            self.active[self.current_session] = issue_id
+            self._note_issue(issue_id)
             result = notify_team(team_id="team_does_not_exist", issue_id=issue_id, notification_type="new_issue")
             assert result["status"] == "error"
             return f"Ticket {issue_id} was created, but I could not notify the responsible team right now."
@@ -314,7 +432,7 @@ class CampusGreenDriver(FakeAgentService):
 
         # --- Follow-up escalation -----------------------------------------------
         if any(word in lowered for word in ("getting worse", "worse", "spreading", "getting bigger")):
-            active = self.active.get(self.current_session)
+            active = self._resolve_reference(self.current_session, prompt) or self.active.get(self.current_session)
             if not active:
                 return "I could not tell which issue you mean. Could you give me the ticket ID?"
             current = get_issue(active)
@@ -322,6 +440,7 @@ class CampusGreenDriver(FakeAgentService):
                 return f"I could not retrieve ticket {active}. Please try again in a moment."
             updated = update_issue(active, priority="CRITICAL", status="ESCALATED", additional_note=prompt)
             if updated["status"] == "ok":
+                self._note_issue(active)
                 team_id = updated["issue"]["assigned_team_id"]
                 notify_team(
                     team_id=team_id,
@@ -334,10 +453,11 @@ class CampusGreenDriver(FakeAgentService):
 
         # --- "Has the team been notified?" (answer from recorded state) --------
         if "notified" in lowered or "notify" in lowered:
-            active = self.active.get(self.current_session)
+            active = self._resolve_reference(self.current_session, prompt) or self.active.get(self.current_session)
             if active:
                 records = [n for n in campus_tool._issue_store().notifications if n.get("issue_id") == active]
                 if records:
+                    self._note_issue(active)
                     return f"Yes — {records[-1].get('team_name', 'the responsible team')} was notified for ticket {active}."
                 return f"No notification has been recorded for ticket {active} yet."
             return "I'd need to know which issue you mean. Could you give me the ticket ID?"
@@ -356,9 +476,38 @@ class CampusGreenDriver(FakeAgentService):
         # --- New issue report ------------------------------------------------------
         category = detect_category(prompt)
         location_display = known_location_in(prompt)
+
+        # Continuation: the user just supplied the location a pending report was
+        # waiting on (for example "there's a leak." -> "near Lab 3."). Complete the
+        # same report instead of treating it as a new request.
+        if category is None and location_display is not None and self.current_session in self.pending:
+            pending = self.pending.pop(self.current_session)
+            lookup = lookup_campus_location(location_display)
+            priority = decide_priority(pending["category"], pending["description"])
+            created = create_issue(
+                category=pending["category"],
+                description=pending["description"],
+                location_id=lookup["location"]["location_id"],
+                priority=priority,
+            )
+            if created["status"] != "ok":
+                return "I could not create the maintenance request right now. Please try again."
+            issue_id = created["issue_id"]
+            team_name = created["issue"]["assigned_team"]
+            notify_team(team_id=created["assigned_team_id"], issue_id=issue_id, notification_type="new_issue")
+            self._note_issue(issue_id)
+            return (
+                f"{pending['category'].title()} issue reported.\nTicket: {issue_id}\nLocation: {location_display}\n"
+                f"Priority: {priority}\nAssigned team: {team_name}\nStatus: Reported\n"
+                f"The {team_name} team has been notified."
+            )
+
         if category is not None and location_display is None:
-            lookup_campus_location(prompt)  # mirrors the real flow (result: not found)
-            return "I couldn't identify that campus location. Could you provide the building name, room number, or a nearby known landmark?"
+            if has_location_signal(prompt):
+                lookup_campus_location(prompt)  # mirrors the real flow (result: not found)
+                return "I couldn't identify that campus location. Could you provide the building name, room number, or a nearby known landmark?"
+            self.pending[self.current_session] = {"category": category, "description": prompt}
+            return "I can help with that. Which campus building, room, or landmark is it near?"
         if category is not None and location_display is not None:
             lookup = lookup_campus_location(location_display)
             priority = decide_priority(category, prompt)
@@ -373,12 +522,60 @@ class CampusGreenDriver(FakeAgentService):
             issue_id = created["issue_id"]
             team_name = created["issue"]["assigned_team"]
             notify_team(team_id=created["assigned_team_id"], issue_id=issue_id, notification_type="new_issue")
-            self.active[self.current_session] = issue_id
+            self._note_issue(issue_id)
             return (
                 f"{category.title()} issue reported.\nTicket: {issue_id}\nLocation: {location_display}\n"
                 f"Priority: {priority}\nAssigned team: {team_name}\nStatus: Reported\n"
                 f"The {team_name} team has been notified."
             )
+
+        # --- Unsupported / out-of-scope request ------------------------------------
+        if any(
+            word in lowered
+            for word in ("book", "reserve a", "book a", "schedule a class", "order food", "pay", "enroll", "bus")
+        ):
+            return (
+                "That's outside what I can do. I'm CampusGreen, your campus sustainability coordinator: "
+                "I can report and track sustainability issues, check a ticket's status, coordinate team "
+                "notifications, and summarize campus sustainability trends. Is there a sustainability "
+                "issue you'd like to report?"
+            )
+
+        # --- Recovery after a failed action -----------------------------------------
+        if "try again" in lowered or "retry" in lowered:
+            active = self.active.get(self.current_session)
+            if active:
+                # An issue was already created; do not duplicate it. Confirm its state.
+                result = get_issue(active)
+                if result["status"] == "ok":
+                    self._note_issue(active)
+                    return (
+                        f"Ticket {active} already exists on record. "
+                        "Let me know if you'd like me to update or escalate it."
+                    )
+            return (
+                "I can retry that for you. Could you describe the issue and where it is, "
+                "or give me the ticket ID if you're following up on one?"
+            )
+
+        # --- Brief conversational courtesies (no tool) ------------------------------
+        stripped = prompt.strip().lower().rstrip("!")
+        if stripped in {
+            "hello",
+            "hi",
+            "hey",
+            "thanks",
+            "thank you",
+            "okay",
+            "ok",
+            "got it",
+            "that's all",
+            "great",
+            "good",
+            "cool",
+            "bye",
+        }:
+            return "You're welcome! I'm here if you need to report an issue or check on one."
 
         # --- Fallback ----------------------------------------------------------------
         return (

@@ -66,7 +66,39 @@ only what's missing (never values), surfaced instead of a stack trace.
 
 See [`INTEGRATION.md`](INTEGRATION.md) for the full wiring and setup.
 
-## Data & reset
+## 4. Polished user flows — one coherent conversation
+
+CampusGreen is built to feel like a single natural conversation, not a menu of
+one-shot commands. The same session carries context across turns: a follow-up
+continues the in-progress task, status questions resolve by topic, and courteous
+or out-of-scope messages are handled conversationally without unnecessary tool
+calls. An example, as a student would experience it on WhatsApp:
+
+```text
+Student: There is a leak.
+CampusGreen: I can help with that. Which campus building, room, or landmark is it near?
+Student: Near Lab 3.
+CampusGreen: Water issue reported. Ticket: WTR-012 … The Facilities Zone B team has been notified.
+
+Student: The bins near the Student Cafe are overflowing.
+CampusGreen: Waste issue reported. Ticket: WST-007 … The Catering Services team has been notified.
+
+Student: What is the status of the leak?
+CampusGreen: Ticket: WTR-012 — Status: REPORTED, Priority: HIGH, Assigned team: Facilities Zone B.
+Student: It is getting worse and spreading.
+CampusGreen: Ticket WTR-012 escalated to Critical. The Facilities Zone B team has been notified.
+
+Student: Thanks!
+CampusGreen: You're welcome! I'm here if you need to report an issue or check on one.
+Student: Can you book me a university bus?
+CampusGreen: That's outside what I can do. I can report and track sustainability issues…
+```
+
+Each turn is answered the same way the real product would be, and nothing is ever
+fabricated: every claim about a ticket, team, status, or notification comes from a
+tool result, and polite acknowledgements and refusals make no tool call at all.
+
+## 5. Data & reset
 
 All surfaces persist issues and notifications to `data/issues.json` as you use them.
 To return to the seeded state:
@@ -75,14 +107,14 @@ To return to the seeded state:
 git checkout -- data/issues.json
 ```
 
-## Channel and data-directory config
+## 6. Channel and data-directory config
 
 With `CAMPUSGREEN_CHANNEL=whatsapp` and `CAMPUSGREEN_DATA_DIR` unset, issues created
 over WhatsApp are labelled `source_channel: whatsapp`. Set
 `CAMPUSGREEN_CHANNEL=cli` (or unset it) to label issues `cli` for parity with the
 local demo.
 
-## What the demos don't cover
+## 7. What the demos don't cover
 
 The demos intentionally do not cover: multi-tenant access control, a web dashboard,
 long-term analytics, or durable deployed hosting — all deferred (see `SPEC.md` and

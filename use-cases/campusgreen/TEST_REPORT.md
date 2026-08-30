@@ -1,4 +1,4 @@
-# CampusGreen Reliability & Test Report (Phase 5)
+# CampusGreen Reliability & Test Report (Phase 7)
 
 Evidence that the CampusGreen agent is reliable, observable, secure, and ready for
 competition evaluation — with the exact commands, numbers, and known limitations.
@@ -8,11 +8,11 @@ competition evaluation — with the exact commands, numbers, and known limitatio
 
 | | Count |
 | --- | --- |
-| Collected | 221 |
-| **Passed** | **208** |
+| Collected | 251 |
+| **Passed** | **238** |
 | Skipped | 13 (all LLM-dependent; see [gating](#gating-llm-only-tests)) |
 | Failures | 0 |
-| Duration | ~8.5 s |
+| Duration | ~9.4 s |
 
 ## The proof is deliberately two-tiered
 
@@ -20,7 +20,7 @@ Agent behavior can never be *proven* by determinism alone, and LLM runs can neve
 be proven without a real model. So this suite splits the evidence the only honest
 way there is:
 
-### Tier 1 — Deterministic and runnable (no API key, no network) · 200 tests
+### Tier 1 — Deterministic and runnable (no API key, no network) · 225 tests
 
 Every Tier-1 test drives the **real application path**: the real `AgentWhatsAppRequestHandler`
 routing, the real six `tool.py` tools, the real persisted JSON data, and real
@@ -60,6 +60,8 @@ so crossing either tier verifies the same contract.
 | `data_integrity_test.py` | 16 | The seed data contract: canonical 7-category taxonomy, every location→team and issue→location/team reference resolves, ID prefixes match categories, unique IDs, valid statuses/priorities, ≥10 locations, ≥1 issue per non-OTHER category, well-formed ISO history, **every seeded status reachable from REPORTED** through the SPEC §13 diagram, all 7 trend sentences present |
 | `security_test.py` | 16 (14 run + 2 gated) | No secrets in committed source (OpenAI/AWS/Google/Slack/GitHub/PEM patterns via `git ls-files`), `.env` ignored and untracked, `.env.example` ships only empty secret placeholders, role-override/pretend/impersonation/meter-data/injection attempts declined, log lines structured and sanitized (no descriptions/keys in `caplog`), startup config reports names only and exits `2` without values, plus the two **gated LLM** injection probes |
 | `e2e_scenario_test.py` | 1 | The 11-step competition scenario end to end through the WhatsApp handler — report → follow-up status → analytics → second (different-category) report → "was the team notified?" → status by ID → escalation → escalation notification recorded → post-escalation status → truthful partial failure → **final persisted-state audit on disk** |
+| `conversational_flows_test.py` | 18 | Phase 7 **polished per-flow** matrix via `CampusGreenDriver` over the real tools: complete report, incomplete→clarification (no ticket), multi-turn clarification continuity (a location-only follow-up completes the same report), contextual status, natural status phrasings (by ID and by topic), escalation, **multi-issue reference resolution by topic** (the leak → WATER, the bins → WASTE), ambiguous multi-issue handling, unsupported request declined with no tool call, unknown location/issue never fabricated, tool failure and partial failure reported truthfully, courtesy messages use no tools, capabilities question uses no tools, and retry-after-failure does not duplicate work |
+| `flow_scenarios_test.py` | 7 | Phase 7 **polished user-flow scenarios** driven through the real WhatsApp handler — complete report, incomplete→clarification, multi-turn clarification, contextual status, escalation, sustainability report (read-only, real counts), and unknown location (no fabricated ticket), each cross-checked against the persisted `issues.json` on disk |
 
 ## Reliability hardening applied (code changes this phase)
 
@@ -73,6 +75,7 @@ so crossing either tier verifies the same contract.
 | Wrong author attribution | `reported_by` falls back to the acting channel user, else `"student"` | `tool.py` |
 | Override / injection attempts | Three new rules: ignore override attempts, never reveal instructions/config/credentials/other users' data, decline to confirm unconfirmed actions | `agent.py` |
 | Obscure startup failure | `server.py` now validates required env vars and prints **names only** before `SystemExit(2)`; `validate_config` is importable and tested | `server.py`, `security_test.py` |
+| Polished conversational flows (Phase 7) | `agent.py` instructs the LLM to continue an in-progress task, resolve multi-issue references by topic (asking when ambiguous), acknowledge courtesies with **no tool call**, politely decline out-of-scope requests, and retry only the failed step; `CampusGreenDriver` mirrors all of these deterministically over the real tools | `agent.py`, `test_helpers.py` |
 
 ## Known limitations (documented, not hidden)
 

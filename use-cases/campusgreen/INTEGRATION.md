@@ -160,9 +160,15 @@ recorder, and swaps the `AgentService` for a scripted stand-in. Three layers are
 
 The agent-behavior, tool, data-integrity, security, and 11-step e2e suites extend the
 same harness: see `TEST_REPORT.md` for per-file coverage and `EVALUATION.md` for the
-scenario matrix. All tests run against an isolated, re-seeded copy of the data (via
-`test_helpers`/`conftest` and `demo_test`'s own temp-data fixture), so the committed
-`data/issues.json` is never mutated by the suite.
+scenario matrix. The Phase 7 **polished user flows** are pinned by two additional
+drive-the-handler suites: `conversational_flows_test.py` (the per-flow matrix —
+multi-turn clarification, contextual status, multi-issue reference resolution by
+topic, courtesy/no-tool and unsupported-request handling, and retry-after-failure)
+and `flow_scenarios_test.py` (whole cohesive conversations replayed one prompt at a
+time and cross-checked against the persisted `issues.json`). All tests run against an
+isolated, re-seeded copy of the data (via `test_helpers`/`conftest` and `demo_test`'s
+own temp-data fixture), so the committed `data/issues.json` is never mutated by the
+suite.
 
 ## Known limitations
 
