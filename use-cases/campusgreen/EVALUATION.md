@@ -1,8 +1,8 @@
-# CampusGreen Evaluation Matrix (Phase 5)
+# CampusGreen Evaluation Matrix (Phase 7)
 
 A runnable evaluation: every column of the matrix maps a real-user scenario to the
 tests that prove it, so a judge (or another engineer) can replay the evidence
-without taking the document's word for it. Numbers are from the Phase 5 run on
+without taking the document's word for it. Numbers are from the Phase 7 run on
 Windows 11 / Python 3.12.13 / agentkernel 0.8.1 — see [TEST_REPORT.md](TEST_REPORT.md).
 
 | # | Scenario (user says / experiences) | What it must prove | Proof (file + test) |
@@ -26,9 +26,22 @@ Windows 11 / Python 3.12.13 / agentkernel 0.8.1 — see [TEST_REPORT.md](TEST_RE
 | 17 | **Full competition journey (Tier-1, real WhatsApp handler)** | The 11-step scenario end-to-end, finishing with a persisted-state audit on disk. | `e2e_scenario_test.py` |
 | 18 | **LLM truthfulness & injection (Tier-2, gated)** | A real OpenAI-backed agent reports status failures without fabrication, asks for missing info, and refuses prompt-injection / false-notification instructions. | `demo_test.py` conversational tests (11, require `OPENAI_API_KEY` + CLI); `security_test.py::test_llm_refuses_prompt_injection`, `test_llm_wont_claim_false_notification` |
 
+## Phase 7 — polished user flows
+
+| # | Scenario (user says / experiences) | What it must prove | Proof (file + test) |
+| --- | --- | --- | --- |
+| P1 | **Incomplete report answers, not dead-ends** — "There is a problem." / "There is a leak." | The agent asks for exactly what's missing (category, then location) and creates nothing until both are known. | `conversational_flows_test.py::test_incomplete_report_asks_without_creating`; `agent_behavior_test.py::test_missing_information_triggers_questions`; `flow_scenarios_test.py::test_scenario_incomplete_report_clarifies` |
+| P2 | **Multi-turn clarification continues the same report** — "There is a leak." → "Near Lab 3." | A follow-up that only supplies the missing location completes the **same** report (one ticket), per-session. | `conversational_flows_test.py::test_multi_turn_clarification_continues_report`, `test_clarification_scoped_to_session`; `flow_scenarios_test.py::test_scenario_multi_turn_clarification` |
+| P3 | **Contextual status** — "What's the current status?" right after reporting | The follow-up resolves to the just-created issue without re-stating the ID. | `conversational_flows_test.py::test_contextual_status_resolves_just_created_issue`; `flow_scenarios_test.py::test_scenario_contextual_status`; `e2e_scenario_test.py` step 2 |
+| P4 | **Natural status phrasings** — "What's happening with WTR-001?", "Is the leak issue resolved?" | By explicit ID and by topic both resolve to real stored state, never a guess. | `conversational_flows_test.py::test_status_by_explicit_id_natural_phrasing`, `test_status_by_topic_phrasing` |
+| P5 | **Multi-issue reference resolution by topic** — report a leak, then overflowing bins, then ask "What is the status of the leak?" | "the leak" resolves to the WATER issue, "the bins issue" to the WASTE issue — not just "the most recent". | `conversational_flows_test.py::test_multi_issue_reference_resolved_by_topic`, `test_multiple_same_category_issues_ask_when_ambiguous` |
+| P6 | **Unsupported request declined** — "Can you book me a university bus?" | Politely out-of-scope, steers back to sustainability, performs **no** tool action. | `conversational_flows_test.py::test_unsupported_request_honestly_declined` |
+| P7 | **Courtesy / capabilities never waste a tool call** — "Thanks!", "Hello.", "What can you do?" | Natural short reply, no unnecessary tool invocation. | `conversational_flows_test.py::test_courtesy_messages_use_no_tools`, `test_capability_question_uses_no_tools` |
+| P8 | **Retry after failure does not duplicate** — a failed create, then "Please try again." | The agent offers to redo the failed step without re-creating/fabricating an existing ticket. | `conversational_flows_test.py::test_retry_after_failure_does_not_duplicate`; `tool_test.py` `no-write-on-failure` group |
+
 ## Reading the numbers
 
-- **Tier 1 (rows 1–17):** every row is verified by passing tests in this repo's
+- **Tier 1 (rows 1–17 + P1–P8):** every row is verified by passing tests in this repo's
   `use-cases/campusgreen/`. Run `uv run pytest -q --exitfirst` to replay.
 - **Tier 2 (row 18):** guaranteed-skipped on this Windows machine (no
   `OPENAI_API_KEY`, no `readline`), runnable in keyed CI on a POSIX runner. The
@@ -37,7 +50,7 @@ Windows 11 / Python 3.12.13 / agentkernel 0.8.1 — see [TEST_REPORT.md](TEST_RE
 
 ## Verdict
 
-All 17 runnable scenarios pass offline (208 of 221 tests passing, 13 skips are
+All 24 runnable scenarios pass offline (238 of 251 tests passing, 13 skips are
 exclusively Tier-2 LLM tests). The two Phase-5 decisions that are *known product
 limits* — no deduplication, and no full agent-behavior claim from the deterministic
 tier alone — are stated in [TEST_REPORT.md](TEST_REPORT.md) rather than papered over.
