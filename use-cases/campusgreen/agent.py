@@ -1,5 +1,8 @@
+import os
+
 from agentkernel.openai import OpenAIToolBuilder
-from agents import Agent
+from agents import Agent, OpenAIChatCompletionsModel
+from openai import AsyncOpenAI
 
 from tool import Tools
 
@@ -169,6 +172,26 @@ MESSAGING CHANNEL (WhatsApp)
   IDs, give status, ask for missing or unknown details, and explain failures truthfully.
 """
 
+
+def _resolve_model():
+    """Return an explicit model for the OpenAI Agents SDK agent, or None for the SDK default.
+
+    By default the SDK resolves a chat-completions/Responses model from ``OPENAI_API_KEY`` and the
+    ``OPENAI_DEFAULT_MODEL``/SDK-default model. To run the same agent against a chat-completions-
+    only provider that is not OpenAI (for example Groq), set ``GROQ_API_KEY`` (and optionally
+    ``GROQ_MODEL``, defaulting to the hosted chat-completions model below). This constructs an
+    explicit ``OpenAIChatCompletionsModel`` pointed at the provider's chat-completions endpoint —
+    Groq has no Responses API, so it must always use chat-completions. When no Groq key is set the
+    returned ``None`` keeps the original OpenAI behaviour unchanged.
+    """
+    key = (os.environ.get("GROQ_API_KEY") or "").strip()
+    if not key:
+        return None
+    model = (os.environ.get("GROQ_MODEL") or "llama-3.3-70b-versatile").strip()
+    client = AsyncOpenAI(base_url="https://api.groq.com/openai/v1", api_key=key)
+    return OpenAIChatCompletionsModel(model=model, openai_client=client)
+
+
 campusgreen_agent = Agent(
     name="campusgreen",
     handoff_description=(
@@ -177,6 +200,7 @@ campusgreen_agent = Agent(
     ),
     instructions=INSTRUCTIONS,
     tools=OpenAIToolBuilder.bind(Tools),
+    model=_resolve_model(),
 )
 
 AGENTS = [campusgreen_agent]

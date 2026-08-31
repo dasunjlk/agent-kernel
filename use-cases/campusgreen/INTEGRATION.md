@@ -125,8 +125,26 @@ environment.
 | `AK_WHATSAPP__VERIFY_TOKEN` | Webhook verification token (server only). |
 | `AK_WHATSAPP__APP_SECRET` | Optional — enables request-signature verification. |
 | `OPENAI_API_KEY` | Lets the agent reason and call tools (demo and server). |
+| `GROQ_API_KEY` | Optional — route the agent through Groq (chat-completions only). See *LLM providers* below. |
+| `GROQ_MODEL` | Optional — Groq model to use when `GROQ_API_KEY` is set (default `llama-3.3-70b-versatile`). |
 | `CAMPUSGREEN_DATA_DIR` | Optional — point the JSON data layer elsewhere. |
 | `CAMPUSGREEN_CHANNEL` | Optional — stamped on issues as `source_channel` (default `cli`). |
+
+### LLM providers
+
+The WhatsApp path registers the same `AGENTS` from `agent.py`, so whichever model the agent
+resolves applies to the server exactly as it does to the CLI. By default the OpenAI Agents SDK
+serves OpenAI's Responses API. To run the server against **Groq** — which only serves
+chat-completions — set `GROQ_API_KEY` (and optionally `GROQ_MODEL`); `agent.py` then builds an
+explicit `OpenAIChatCompletionsModel` pointed at `https://api.groq.com/openai/v1`. Without the key
+the OpenAI path is unchanged.
+
+**Real-credential smoke test.** The deterministic suite proves routing, session isolation, the
+boundary shim, and the tool workflows offline with no credentials. Live end-to-end WhatsApp
+delivery still requires a POST-Phase-9 smoke test in an environment holding real
+`AK_WHATSAPP__*` / `OPENAI_API_KEY` (or `GROQ_API_KEY`) credentials and a public HTTPS tunnel —
+that cannot be reproduced in a credential-less Windows sandbox and is not part of the offline
+suite.
 
 ## Testing
 

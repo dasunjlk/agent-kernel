@@ -402,6 +402,7 @@ dev = [
     { name = "isort" },
     { name = "mypy" },
     { name = "pytest" },
+    { name = "pytest-order" },
 ]
 
 [package.metadata]
@@ -414,6 +415,7 @@ dev = [
     { name = "isort", specifier = ">=5.0.0" },
     { name = "mypy", specifier = ">=1.0.0" },
     { name = "pytest", specifier = ">=8.0.0" },
+    { name = "pytest-order", specifier = ">=1.1.0" },
 ]
 
 [[package]]

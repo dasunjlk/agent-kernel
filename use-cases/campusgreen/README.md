@@ -63,6 +63,23 @@ the WhatsApp server — only the channel boundary differs.
 See [`INTEGRATION.md`](INTEGRATION.md) for the full architecture, runtime configuration, and
 offline testing notes.
 
+## LLM providers
+
+The agent reasons through the OpenAI Agents SDK, which serves OpenAI's Responses API by default.
+To run the same agent against a chat-completions-only provider such as **Groq**, set a Groq key:
+
+```bash
+export GROQ_API_KEY=...            # overrides the OpenAI path
+export GROQ_MODEL=llama-3.3-70b-versatile   # optional; defaults to llama-3.3-70b-versatile
+```
+
+When `GROQ_API_KEY` is set, `agent.py` builds an explicit
+`OpenAIChatCompletionsModel` pointed at `https://api.groq.com/openai/v1` (Groq has no Responses
+API). Without it, the agent keeps the default OpenAI behaviour unchanged, so both CLI and WhatsApp
+paths work with just `OPENAI_API_KEY`. The model wiring is covered by `groq_readiness_test.py`:
+its deterministic checks run offline, and a live Groq probe is gated on `GROQ_API_KEY` plus the
+Unix-only CLI (skipped on stock Windows and without a key).
+
 ## Tools
 
 The agent binds all seven tools through Agent Kernel's `OpenAIToolBuilder`. Each tool returns a
@@ -111,19 +128,21 @@ call, so a single build can run against any data snapshot without re-installing.
 uv run pytest -q
 ```
 
-The campusgreen test suite is **280 tests: 265 pass, 15 skip** on this machine
-(13–20 s), built in two honest tiers:
+The campusgreen test suite is **287 tests: 271 pass, 16 skip** on this machine
+(~69 s), built in two honest tiers:
 
-- **Tier 1 — deterministic (265 tests):** everything is testable without a key or
+- **Tier 1 — deterministic (271 tests):** everything is testable without a key or
   network — the real WhatsApp handler routing, the real seven tools, the real JSON
   data layer, per-sender session isolation, the SPEC §13 lifecycle state machine,
   analytics, action planning, notification truthfulness, data-integrity,
-  security/hygiene, and an 11-step end-to-end competition scenario that finishes
-  with a persisted-state audit. See `EVALUATION.md` for the scenario matrix.
-- **Tier 2 — LLM-dependent (15 gated tests):** conversational tests via the Agent
+  security/hygiene, the env-gated Groq model wiring, and an 11-step end-to-end
+  competition scenario that finishes with a persisted-state audit. See
+  `EVALUATION.md` for the scenario matrix.
+- **Tier 2 — LLM-dependent (16 gated tests):** conversational tests via the Agent
   Kernel test harness plus two real prompt-injection probes (and, in Phase 8, an
-  action-plan and an explicit-escalation probe). They run when
-  `OPENAPI_API_KEY` is set on a platform with the Unix `readline` module (not stock
+  action-plan and an explicit-escalation probe), plus a live Groq connectivity
+  probe. They run when
+  `OPENAI_API_KEY` is set on a platform with the Unix `readline` module (not stock
   Windows), and are strictly skipped otherwise.
 
 All tests run against isolated copies of the data files (via `CAMPUSGREEN_DATA_DIR`
@@ -149,6 +168,7 @@ per-file coverage, and known limitations are in [`TEST_REPORT.md`](TEST_REPORT.m
 - `data_integrity_test.py` — 16 seed-data cross-reference/taxonomy integrity tests.
 - `security_test.py` — 16 secret-scan / input-boundary / log-sanitization tests (incl. 2 gated LLM probes).
 - `e2e_scenario_test.py` — the 11-step end-to-end competition scenario with a disk audit.
+- `groq_readiness_test.py` — Phase 9A: env-gated Groq model wiring (deterministic, offline) + a live client probe gated on `GROQ_API_KEY`/CLI.
 - `test_helpers.py` / `conftest.py` — shared offline harness + isolated-data fixtures.
 - `TEST_REPORT.md` — reliability & testing evidence report.
 - `DEMO.md` — how to run each demo surface.
