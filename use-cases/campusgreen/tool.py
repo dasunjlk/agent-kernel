@@ -391,11 +391,16 @@ def lookup_campus_location(query: str) -> dict:
     responsible team) or a location_not_found error. Never invent a location
     when this tool says a place is unknown; ask the user instead.
     """
-    text = _coerce_str(query).strip()
+    if not isinstance(query, str):
+        return _error("location_not_found", f"Query must be a string; got {type(query).__name__}.")
+    text = query.strip()
     if not text:
         return _error("empty_query", "No location text was provided.")
     needle = text.lower()
-    for location in _load_json("locations.json"):
+    locations = _load_json("locations.json")
+
+    # Pass 1: exact match against display_name, location_id, or aliases
+    for location in locations:
         candidates = [str(location.get("display_name", "")), str(location.get("location_id", ""))]
         candidates.extend(str(alias) for alias in location.get("aliases") or [])
         if needle in {candidate.strip().lower() for candidate in candidates if candidate.strip()}:
@@ -413,6 +418,39 @@ def lookup_campus_location(query: str) -> dict:
                     "responsible_team": team["name"] if team else location.get("responsible_team_id", ""),
                 },
             }
+
+    # Pass 2: whole-word phrase match (e.g., "outside Lab 3" or "in Main Library restroom")
+    best_match = None
+    best_len = 0
+    for location in locations:
+        candidates = [str(location.get("display_name", "")), str(location.get("location_id", ""))]
+        candidates.extend(str(alias) for alias in location.get("aliases") or [])
+        for cand in candidates:
+            cand_clean = cand.strip().lower()
+            if not cand_clean or len(cand_clean) < 3:
+                continue
+            pattern = r"\b" + re.escape(cand_clean) + r"\b"
+            if re.search(pattern, needle):
+                if len(cand_clean) > best_len:
+                    best_len = len(cand_clean)
+                    best_match = location
+
+    if best_match is not None:
+        team = _team_by_id(best_match.get("responsible_team_id", ""))
+        return {
+            "status": "ok",
+            "location": {
+                "location_id": best_match["location_id"],
+                "display_name": best_match["display_name"],
+                "building": best_match.get("building", ""),
+                "floor": best_match.get("floor", ""),
+                "zone": best_match.get("zone", ""),
+                "aliases": best_match.get("aliases") or [],
+                "responsible_team_id": best_match.get("responsible_team_id", ""),
+                "responsible_team": team["name"] if team else best_match.get("responsible_team_id", ""),
+            },
+        }
+
     return _error("location_not_found", f"No known campus location matches '{text}'.")
 
 
@@ -422,8 +460,8 @@ def create_issue(
     description: str,
     location_id: str,
     priority: str,
-    reported_by: str = "",
-    source_channel: str = "cli",
+    reported_by: str | None = "",
+    source_channel: str | None = "cli",
 ) -> dict:
     """Create a new sustainability issue record.
 
@@ -522,7 +560,7 @@ def _created_timestamp(issue: dict[str, Any]) -> float:
 
 
 @_logged
-def search_issues(category: str = "", status: str = "", location_id: str = "", limit: int = 20) -> dict:
+def search_issues(category: str | None = "", status: str | None = "", location_id: str | None = "", limit: int | None = 20) -> dict:
     """List recorded issues matching optional filters (no ranking opinion).
 
     Use when you need to inspect the actual issue records behind a question:
@@ -692,7 +730,12 @@ def update_issue(
 
 
 @_logged
-def notify_team(team_id: str, issue_id: str, message: str = "", notification_type: str = "update") -> dict:
+def notify_team(
+    team_id: str,
+    issue_id: str,
+    message: str | None = "",
+    notification_type: str | None = "update",
+) -> dict:
     """Notify a campus team about an issue via the local mock channel.
 
     Use after an issue is created or updated so the responsible team is told.

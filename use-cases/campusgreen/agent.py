@@ -1,12 +1,5 @@
 import os
 
-try:
-    from dotenv import load_dotenv
-
-    load_dotenv()
-except ImportError:
-    pass
-
 from agentkernel.openai import OpenAIToolBuilder
 from agents import Agent, OpenAIChatCompletionsModel
 from openai import AsyncOpenAI
@@ -195,7 +188,7 @@ def _resolve_model():
     if not key:
         return None
     model = (os.environ.get("GROQ_MODEL") or "llama-3.3-70b-versatile").strip()
-    client = AsyncOpenAI(base_url="https://api.groq.com/openai/v1", api_key=key)
+    client = AsyncOpenAI(base_url="https://api.groq.com/openai/v1", api_key=key, timeout=60.0)
     return OpenAIChatCompletionsModel(model=model, openai_client=client)
 
 
