@@ -28,6 +28,13 @@ from typing import Any
 import httpx
 from agentkernel.telegram import AgentTelegramRequestHandler
 
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass
+
 _DEDUP_MAX = 10000
 
 START_MESSAGE = (
@@ -50,6 +57,15 @@ class CampusGreenTelegramHandler(AgentTelegramRequestHandler):
     """Adds message normalization, duplicate-event guards, /start behavior, and polling."""
 
     def __init__(self) -> None:
+        import os
+        from agentkernel.core import Config
+
+        token = (os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("AK_TELEGRAM__BOT_TOKEN") or "").strip()
+        if token:
+            os.environ["AK_TELEGRAM__BOT_TOKEN"] = token
+            os.environ["TELEGRAM_BOT_TOKEN"] = token
+            Config._reset()
+
         super().__init__()
         self._log = logging.getLogger("ak.api.telegram.campusgreen")
         self._seen_update_ids: set[str] = set()

@@ -41,16 +41,6 @@ try:
 except ImportError:
     pass
 
-from agent import AGENTS
-from agentkernel.openai import OpenAIModule
-from telegram_handler import CampusGreenTelegramHandler
-
-OpenAIModule(AGENTS)
-
-REQUIRED_ENV_VARS = [
-    "TELEGRAM_BOT_TOKEN",
-]
-
 
 def _sync_env(env: dict) -> None:
     """Ensure TELEGRAM_BOT_TOKEN and AK_TELEGRAM__BOT_TOKEN are synchronized."""
@@ -58,6 +48,19 @@ def _sync_env(env: dict) -> None:
     if token:
         env.setdefault("TELEGRAM_BOT_TOKEN", token)
         env.setdefault("AK_TELEGRAM__BOT_TOKEN", token)
+
+
+_sync_env(os.environ)
+
+from agent import AGENTS
+from agentkernel.core import Config
+
+Config._reset()
+
+from agentkernel.openai import OpenAIModule
+from telegram_handler import CampusGreenTelegramHandler
+
+OpenAIModule(AGENTS)
 
 
 def validate_config(environ: dict | None = None) -> list[str]:
