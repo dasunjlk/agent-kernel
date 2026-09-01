@@ -1,9 +1,9 @@
 """Shared offline helpers for the CampusGreen reliability test suite.
 
-These reuse the pattern established in ``integration_test.py``: the WhatsApp
-handler is constructed without running its real ``__init__`` (no Meta
+These reuse the pattern established in ``integration_test.py``: the Telegram
+handler is constructed without running its real ``__init__`` (no bot token
 credentials needed), outbound sends are recorded in memory, and the
-``AgentService`` the handler instantiates is swapped for a scripted stand-in
+``ChatService`` the handler instantiates is swapped for a scripted stand-in
 that drives the **real** CampusGreen tools (``tool.py``). Everything runs
 against an isolated copy of the seed data and never touches a live messaging
 service or an LLM.
@@ -82,61 +82,122 @@ def isolated_data_env():
 
 
 def new_handler():
-    """Construct the WhatsApp handler without running __init__ (no credentials)."""
-    from agentkernel.integration.whatsapp.whatsapp_chat import AgentWhatsAppRequestHandler
+    """Construct the Telegram handler without running __init__ (no credentials)."""
+    from agentkernel.integration.telegram.telegram_chat import AgentTelegramRequestHandler
 
-    handler = object.__new__(AgentWhatsAppRequestHandler)
-    handler._log = logging.getLogger("ak.api.whatsapp.campusgreen.test")
-    handler._whatsapp_agent = "campusgreen"
-    handler._whatsapp_agent_acknowledgement = None
+    handler = object.__new__(AgentTelegramRequestHandler)
+    handler._log = logging.getLogger("ak.api.telegram.campusgreen.test")
+    handler._telegram_agent = "campusgreen"
+    handler._bot_token = "demo_token"
+    handler._webhook_secret = None
+    handler._api_version = "bot"
+    handler._base_url = "https://api.telegram.org/botdemo_token"
+    handler._http_timeout = 30.0
     handler._max_file_size = 10 * 1024 * 1024
-    handler._app_secret = None
     handler.sent = []
     handler.last_sender = None
 
-    async def fake_send(to_number, text, reply_to_message_id=None):
-        handler.last_sender = to_number
-        handler.sent.append((to_number, text, reply_to_message_id))
+    async def fake_send(chat_id, text, parse_mode=None, reply_markup=None):
+        handler.last_sender = str(chat_id)
+        handler.sent.append((str(chat_id), text, reply_markup))
+
+    async def fake_chat_action(chat_id, action="typing"):
+        pass
 
     handler._send_message = fake_send
+    handler._send_chat_action = fake_chat_action
+
+    orig_handle = handler._handle_message
+
+    async def tolerant_handle(msg, *args, **kwargs):
+        return await orig_handle(msg)
+
+    handler._handle_message = tolerant_handle
     return handler
 
 
 def new_shim_handler():
-    """Construct the CampusGreen WhatsApp shim without running __init__.
+    """Construct the CampusGreen Telegram shim without running __init__.
 
-    Identical to ``new_handler()`` but builds ``CampusGreenWhatsAppHandler``
-    (the thin normalization + duplicate-event boundary — see
-    ``whatsapp_handler.py``) so the Phase 6 shim's own behavior is testable
-    offline with a scripted ``AgentService`` and an in-memory send recorder.
+    Identical to ``new_handler()`` but builds ``CampusGreenTelegramHandler``
+    (the normalization, duplicate-event, and /start boundary — see
+    ``telegram_handler.py``) so the Phase 9A shim's own behavior is testable
+    offline with a scripted ``ChatService`` and an in-memory send recorder.
     """
-    from whatsapp_handler import CampusGreenWhatsAppHandler
+    from telegram_handler import CampusGreenTelegramHandler
 
     handler = new_handler()
-    shim = object.__new__(CampusGreenWhatsAppHandler)
-    for attr in ("_log", "_whatsapp_agent", "_whatsapp_agent_acknowledgement", "_max_file_size", "_app_secret"):
+    shim = object.__new__(CampusGreenTelegramHandler)
+    for attr in (
+        "_log",
+        "_telegram_agent",
+        "_bot_token",
+        "_webhook_secret",
+        "_api_version",
+        "_base_url",
+        "_http_timeout",
+        "_max_file_size",
+    ):
         setattr(shim, attr, getattr(handler, attr))
     shim.sent = []
     shim.last_sender = None
 
-    async def fake_send(to_number, text, reply_to_message_id=None):
-        shim.last_sender = to_number
-        shim.sent.append((to_number, text, reply_to_message_id))
+    async def fake_send(chat_id, text, parse_mode=None, reply_markup=None):
+        shim.last_sender = str(chat_id)
+        shim.sent.append((str(chat_id), text, reply_markup))
+
+    async def fake_chat_action(chat_id, action="typing"):
+        pass
 
     shim._send_message = fake_send
+    shim._send_chat_action = fake_chat_action
+    shim._seen_update_ids = set()
     shim._seen_message_ids = set()
     return shim
 
 
 def install_service(service, monkeypatch):
-    """Swap the handler's AgentService factory so it yields the given fake."""
-    import agentkernel.integration.whatsapp.whatsapp_chat as whatsapp_chat
+    """Swap the handler's AgentService / ChatService factory so it yields the given fake."""
+    import agentkernel.integration.telegram.telegram_chat as telegram_chat
 
-    monkeypatch.setattr(whatsapp_chat, "AgentService", lambda: service)
+    if hasattr(telegram_chat, "AgentService"):
+        monkeypatch.setattr(telegram_chat, "AgentService", lambda: service)
+    elif hasattr(telegram_chat, "ChatService"):
+
+        class _Adapter:
+            def __init__(self, svc):
+                self.svc = svc
+
+            async def execute(self, req, requests=None):
+                if getattr(self.svc, "agent_truthy", True) is False:
+                    raise ValueError("No agent available")
+                if getattr(self.svc, "error", None) is not None:
+                    raise self.svc.error
+                self.svc.select(session_id=req.session_id, name=req.agent)
+                reply = await self.svc.run_multi(requests, acting_user_id=req.user_id)
+                return reply.response, req.session_id
+
+        monkeypatch.setattr(telegram_chat, "ChatService", lambda: _Adapter(service))
 
 
-def text_message(body="hello", from_number=FROM_A, message_id="m1"):
-    return {"id": message_id, "from": from_number, "type": "text", "text": {"body": body}}
+def text_message(body="hello", from_number=FROM_A, message_id=101):
+    try:
+        chat_id_int = int(str(from_number).replace("+", ""))
+    except ValueError:
+        chat_id_int = 12345
+    return {
+        "message_id": message_id,
+        "from": {"id": chat_id_int, "first_name": "Student", "is_bot": False},
+        "chat": {"id": chat_id_int, "type": "private"},
+        "text": body,
+    }
+
+
+def telegram_update(body="hello", from_number=FROM_A, message_id=101, update_id=1001):
+    return {
+        "update_id": update_id,
+        "message": text_message(body=body, from_number=from_number, message_id=message_id),
+    }
 
 
 def reload_issues(path: Path) -> tuple[list, list]:

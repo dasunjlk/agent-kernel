@@ -1,19 +1,21 @@
-"""Tests for the CampusGreen WhatsApp integration layer.
+"""Tests for the CampusGreen Telegram integration layer.
 
-These verify the Agent Kernel messaging boundary (``AgentWhatsAppRequestHandler``)
-exactly as the installed Agent Kernel builds it: the handler is constructed
-without running its ``__init__`` (so no Meta credentials are needed), its outbound
-``_send_message`` is replaced with an in-memory recorder, and the ``AgentService``
-the handler instantiates is swapped for a scripted stand-in so no real agent or
-live network is touched. Helpers come from ``test_helpers.py``.
+These verify the Agent Kernel messaging boundary (``AgentTelegramRequestHandler``
+wrapped by ``CampusGreenTelegramHandler``) exactly as the installed Agent Kernel
+builds it: the handler is constructed without running its ``__init__`` (so no
+real Telegram bot token is needed), its outbound ``_send_message`` is replaced
+with an in-memory recorder, and the ``ChatService`` the handler instantiates is
+swapped for a scripted stand-in so no real agent or live network is touched.
+Helpers come from ``test_helpers.py``.
 
 Two layers are covered:
 
-- **Routing / session / errors** (``FakeAgentService``): an incoming WhatsApp
+- **Routing / session / errors** (``FakeAgentService``): an incoming Telegram
   text message reaches the agent service with the right prompt, ``session_id``
-  (= sender number) and agent name; distinct senders get distinct sessions; the
-  agent reply is sent back as a WhatsApp message; a missing agent and a raised
-  error both map to friendly WhatsApp messages.
+  (= chat_id) and agent name; distinct senders get distinct sessions; the
+  agent reply is sent back as a Telegram message; a missing agent and a raised
+  error both map to friendly Telegram messages; /start command returns the
+  CampusGreen introduction.
 - **Tool workflows through the handler** (``CampusGreenDriver``): a deterministic
   stand-in for the LLM agent drives the **real** CampusGreen tools (``tool.py``)
   for every required scenario — report (lookup -> create -> notify), unknown
@@ -42,6 +44,7 @@ from test_helpers import (
     new_handler,
     new_shim_handler,
     reload_issues,
+    telegram_update,
     text_message,
 )
 
@@ -52,11 +55,11 @@ async def test_message_routes_text_to_agent_service(monkeypatch):
     install_service(service, monkeypatch)
     handler = new_handler()
 
-    await handler._handle_message(text_message("There's a water leak outside Lab 3."), {})
+    await handler._handle_message(text_message("There's a water leak outside Lab 3."))
 
     assert len(service.selects) == 1
     session_id, name = service.selects[0]
-    assert session_id == FROM_A
+    assert session_id == str(FROM_A)
     assert name == "campusgreen"
 
     assert len(service.run_calls) == 1
@@ -70,26 +73,25 @@ async def test_session_isolation_between_senders(monkeypatch):
     install_service(service, monkeypatch)
     handler = new_handler()
 
-    await handler._handle_message(text_message("hello A", from_number=FROM_A), {})
-    await handler._handle_message(text_message("hello B", from_number=FROM_B), {})
+    await handler._handle_message(text_message("hello A", from_number=FROM_A))
+    await handler._handle_message(text_message("hello B", from_number=FROM_B))
 
-    assert [s for s, _ in service.selects] == [FROM_A, FROM_B]
+    assert [s for s, _ in service.selects] == [str(FROM_A), str(FROM_B)]
     assert service.selects[0][0] != service.selects[1][0]
 
 
 @pytest.mark.asyncio
-async def test_agent_reply_is_sent_back_as_whatsapp_message(monkeypatch):
+async def test_agent_reply_is_sent_back_as_telegram_message(monkeypatch):
     service = FakeAgentService(reply="Ticket: WTR-001")
     install_service(service, monkeypatch)
     handler = new_handler()
 
-    await handler._handle_message(text_message("There's a water leak outside Lab 3."), {})
+    await handler._handle_message(text_message("There's a water leak outside Lab 3."))
 
     assert handler.sent
-    to_number, text, reply_to = handler.sent[-1]
-    assert to_number == FROM_A
+    chat_id, text, _ = handler.sent[-1]
+    assert chat_id == str(FROM_A)
     assert text == "Ticket: WTR-001"
-    assert reply_to == "m1"
 
 
 @pytest.mark.asyncio
@@ -98,7 +100,7 @@ async def test_missing_agent_maps_to_friendly_message(monkeypatch):
     install_service(service, monkeypatch)
     handler = new_handler()
 
-    await handler._handle_message(text_message(), {})
+    await handler._handle_message(text_message())
 
     assert handler.sent[-1][1] == "Sorry, no agent is available to handle your request."
     assert service.run_calls == [], "agent must not run when none was selected"
@@ -110,25 +112,41 @@ async def test_generic_error_maps_to_friendly_message(monkeypatch):
     install_service(service, monkeypatch)
     handler = new_handler()
 
-    await handler._handle_message(text_message(), {})
+    await handler._handle_message(text_message())
 
     assert handler.sent[-1][1] == "Sorry, there was an error processing your request."
 
 
+# --- Phase 9A boundary shim: normalization, /start, & duplicate-event handling ---
+
+
 @pytest.mark.asyncio
-async def test_audio_message_rejected_before_agent(monkeypatch):
+async def test_start_command_returns_campusgreen_introduction(monkeypatch):
     service = FakeAgentService()
     install_service(service, monkeypatch)
-    handler = new_handler()
+    handler = new_shim_handler()
 
-    await handler._handle_message({"id": "m3", "from": FROM_A, "type": "audio"}, {})
+    await handler._handle_message(text_message("/start"))
 
-    assert service.selects == []
+    assert service.run_calls == [], "/start must be handled directly by the boundary without running the agent"
+    assert handler.sent
+    reply = handler.sent[-1][1]
+    assert "CampusGreen" in reply
+    assert "sustainability" in reply.lower()
+
+
+@pytest.mark.asyncio
+async def test_help_command_returns_help_text(monkeypatch):
+    service = FakeAgentService()
+    install_service(service, monkeypatch)
+    handler = new_shim_handler()
+
+    await handler._handle_message(text_message("/help"))
+
     assert service.run_calls == []
-    assert handler.sent[-1][1] == "Sorry, audio and video messages are not supported yet."
-
-
-# --- Phase 6 boundary shim: normalization + duplicate-event handling ---------
+    assert handler.sent
+    reply = handler.sent[-1][1]
+    assert "Available commands" in reply
 
 
 @pytest.mark.asyncio
@@ -137,8 +155,8 @@ async def test_whitespace_only_message_is_ignored(monkeypatch):
     install_service(service, monkeypatch)
     handler = new_shim_handler()
 
-    await handler._handle_message(text_message("    "), {})
-    await handler._handle_message(text_message("  \n\t "), {})
+    await handler._handle_message(text_message("    "))
+    await handler._handle_message(text_message("  \n\t "))
 
     assert service.selects == [], "whitespace-only text must not reach the agent"
     assert service.run_calls == [], "whitespace-only text must not run the agent"
@@ -151,7 +169,7 @@ async def test_empty_text_body_is_ignored(monkeypatch):
     install_service(service, monkeypatch)
     handler = new_shim_handler()
 
-    await handler._handle_message(text_message(""), {})
+    await handler._handle_message(text_message(""))
 
     assert service.selects == []
     assert service.run_calls == []
@@ -164,7 +182,7 @@ async def test_text_is_normalized_to_agent(monkeypatch):
     install_service(service, monkeypatch)
     handler = new_shim_handler()
 
-    await handler._handle_message(text_message("  There's a water leak outside Lab 3.  "), {})
+    await handler._handle_message(text_message("  There's a water leak outside Lab 3.  "))
 
     assert len(service.run_calls) == 1
     requests = service.run_calls[0]
@@ -177,14 +195,29 @@ async def test_duplicate_message_id_processed_once(monkeypatch):
     install_service(service, monkeypatch)
     handler = new_shim_handler()
 
-    first = text_message("There's a water leak outside Lab 3.", message_id="wamid.dup.1")
-    await handler._handle_message(first, {})
+    first = text_message("There's a water leak outside Lab 3.", message_id=9001)
+    await handler._handle_message(first)
     assert len(service.run_calls) == 1, "the first delivery must be processed"
 
-    duplicate = text_message("There's a water leak outside Lab 3.", message_id="wamid.dup.1")
-    await handler._handle_message(duplicate, {})
+    duplicate = text_message("There's a water leak outside Lab 3.", message_id=9001)
+    await handler._handle_message(duplicate)
     assert len(service.run_calls) == 1, "a redelivered event with the same ID must be skipped"
     assert len(handler.sent) == 1, "a redelivered event must not produce a second reply"
+
+
+@pytest.mark.asyncio
+async def test_duplicate_update_id_processed_once(monkeypatch):
+    service = FakeAgentService(reply="Done")
+    install_service(service, monkeypatch)
+    handler = new_shim_handler()
+
+    update1 = telegram_update("There's a water leak outside Lab 3.", message_id=9002, update_id=8001)
+    await handler._process_webhook_body(update1)
+    assert len(service.run_calls) == 1
+
+    update_dup = telegram_update("There's a water leak outside Lab 3.", message_id=9003, update_id=8001)
+    await handler._process_webhook_body(update_dup)
+    assert len(service.run_calls) == 1, "duplicate update_id must be skipped"
 
 
 @pytest.mark.asyncio
@@ -193,8 +226,8 @@ async def test_same_content_distinct_ids_both_processed(monkeypatch):
     install_service(service, monkeypatch)
     handler = new_shim_handler()
 
-    await handler._handle_message(text_message("There's a water leak outside Lab 3.", message_id="wamid.a"), {})
-    await handler._handle_message(text_message("There's a water leak outside Lab 3.", message_id="wamid.b"), {})
+    await handler._handle_message(text_message("There's a water leak outside Lab 3.", message_id=9010))
+    await handler._handle_message(text_message("There's a water leak outside Lab 3.", message_id=9011))
 
     assert len(service.run_calls) == 2, "dedup is by message ID, not content"
     assert len(handler.sent) == 2, "distinct user-sent messages must each be answered"
@@ -211,7 +244,7 @@ async def test_report_workflow_lookup_create_notify(isolated_store, isolated_dat
     before, _ = reload_issues(Path(isolated_data_dir) / "issues.json")
     seed_ids = {item["issue_id"] for item in before}
 
-    await handler._handle_message(text_message("There's a water leak outside Lab 3."), {})
+    await handler._handle_message(text_message("There's a water leak outside Lab 3."))
 
     issues, notifications = reload_issues(Path(isolated_data_dir) / "issues.json")
     new_ids = [item["issue_id"] for item in issues if item["issue_id"] not in seed_ids]
@@ -241,7 +274,7 @@ async def test_unknown_location_creates_no_issue(isolated_store, isolated_data_d
     before, _ = reload_issues(Path(isolated_data_dir) / "issues.json")
     seed_ids = {item["issue_id"] for item in before}
 
-    await handler._handle_message(text_message("There's a water leak near the old building."), {})
+    await handler._handle_message(text_message("There's a water leak near the old building."))
 
     issues, _ = reload_issues(Path(isolated_data_dir) / "issues.json")
     new_ids = [item["issue_id"] for item in issues if item["issue_id"] not in seed_ids]
@@ -257,7 +290,7 @@ async def test_status_request_returns_real_stored_data(isolated_store, isolated_
     install_service(service, monkeypatch)
     handler = new_handler()
 
-    await handler._handle_message(text_message("What's the status of WTR-001?"), {})
+    await handler._handle_message(text_message("What's the status of WTR-001?"))
 
     response_text = handler.sent[-1][1]
     assert "WTR-001" in response_text
@@ -271,10 +304,10 @@ async def test_escalation_updates_and_notifies(isolated_store, isolated_data_dir
     install_service(service, monkeypatch)
     handler = new_handler()
 
-    await handler._handle_message(text_message("There's a water leak outside Lab 3."), {})
+    await handler._handle_message(text_message("There's a water leak outside Lab 3."))
     ticket = re.search(r"[A-Z]{3}-\d{3,}", handler.sent[-1][1]).group(0)
 
-    await handler._handle_message(text_message("It's getting worse — water is spreading across the floor."), {})
+    await handler._handle_message(text_message("It's getting worse — water is spreading across the floor."))
 
     issues, notifications = reload_issues(Path(isolated_data_dir) / "issues.json")
     issue = next(item for item in issues if item["issue_id"] == ticket)
@@ -295,7 +328,7 @@ async def test_tool_failure_is_reported_truthfully(isolated_store, isolated_data
     before, _ = reload_issues(Path(isolated_data_dir) / "issues.json")
     seed_ids = {item["issue_id"] for item in before}
 
-    await handler._handle_message(text_message("force failure"), {})
+    await handler._handle_message(text_message("force failure"))
 
     issues, _ = reload_issues(Path(isolated_data_dir) / "issues.json")
     new_ids = [item["issue_id"] for item in issues if item["issue_id"] not in seed_ids]
@@ -314,7 +347,7 @@ async def test_partial_failure_create_ok_notify_failed(isolated_store, isolated_
     before, _ = reload_issues(Path(isolated_data_dir) / "issues.json")
     seed_ids = {item["issue_id"] for item in before}
 
-    await handler._handle_message(text_message("force notify failure"), {})
+    await handler._handle_message(text_message("force notify failure"))
 
     issues, notifications = reload_issues(Path(isolated_data_dir) / "issues.json")
     new_ids = [item["issue_id"] for item in issues if item["issue_id"] not in seed_ids]
@@ -345,8 +378,8 @@ async def test_duplicate_report_creates_two_tickets(isolated_store, isolated_dat
     before, _ = reload_issues(Path(isolated_data_dir) / "issues.json")
     seed_ids = {item["issue_id"] for item in before}
 
-    await handler._handle_message(text_message("There's a water leak outside Lab 3."), {})
-    await handler._handle_message(text_message("There's still a water leak outside Lab 3."), {})
+    await handler._handle_message(text_message("There's a water leak outside Lab 3."))
+    await handler._handle_message(text_message("There's still a water leak outside Lab 3."))
 
     issues, _ = reload_issues(Path(isolated_data_dir) / "issues.json")
     new_ids = [item["issue_id"] for item in issues if item["issue_id"] not in seed_ids]
@@ -360,10 +393,10 @@ async def test_multi_turn_status_resolves_active_issue(isolated_store, isolated_
     install_service(service, monkeypatch)
     handler = new_handler()
 
-    await handler._handle_message(text_message("There's a water leak outside Lab 3."), {})
+    await handler._handle_message(text_message("There's a water leak outside Lab 3."))
     ticket = re.search(r"[A-Z]{3}-\d{3,}", handler.sent[-1][1]).group(0)
 
-    await handler._handle_message(text_message("What's the current status?"), {})
+    await handler._handle_message(text_message("What's the current status?"))
 
     response_text = handler.sent[-1][1]
     assert ticket in response_text, "a follow-up status question must resolve to the session's active issue"

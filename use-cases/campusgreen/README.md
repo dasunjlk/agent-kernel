@@ -5,8 +5,8 @@ CampusGreen is a university sustainability coordinator built on Agent Kernel. A 
 pollution, infrastructure), verifies locations, creates and tracks issues, coordinates the
 responsible campus teams, answers analytics questions, and produces prioritized, evidence-grounded
 action plans — backed by seven real Agent Kernel tools
-and a local JSON data layer (Phase 3), served to end users over **WhatsApp** via Agent Kernel's
-messaging integration (Phase 4). The agent never claims a ticket was created or a team was
+and a local JSON data layer (Phase 3), served to end users over **Telegram** via Agent Kernel's
+messaging integration (Phase 9A). The agent never claims a ticket was created or a team was
 notified unless a tool actually did it.
 
 ## Prerequisites
@@ -42,19 +42,19 @@ Escalate the top unresolved energy issue.
 The demo persists issues and notifications to `data/issues.json` as you use it. To reset the data to
 its seeded state, restore the file with `git checkout -- data/issues.json`.
 
-## WhatsApp messaging integration
+## Telegram messaging integration
 
-CampusGreen is also reachable over WhatsApp. The same agent and tools back both the CLI demo and
-the WhatsApp server — only the channel boundary differs.
+CampusGreen is also reachable over Telegram. The same agent and tools back both the CLI demo and
+the Telegram server — only the channel boundary differs.
 
-- **Run it locally with no Meta credentials** (just `OPENAI_API_KEY`):
+- **Run it locally with no Telegram credentials** (just `OPENAI_API_KEY` or `GROQ_API_KEY`):
 
   ```bash
   cp .env.example .env   # Windows: copy .env.example .env, then set OPENAI_API_KEY
   uv run python integration_demo.py
   ```
 
-- **Run the real server** (needs Meta credentials + a public HTTPS tunnel):
+- **Run the real server with long polling** (needs `TELEGRAM_BOT_TOKEN`, no HTTPS tunnel required):
 
   ```bash
   uv run python server.py
@@ -75,7 +75,7 @@ export GROQ_MODEL=llama-3.3-70b-versatile   # optional; defaults to llama-3.3-70
 
 When `GROQ_API_KEY` is set, `agent.py` builds an explicit
 `OpenAIChatCompletionsModel` pointed at `https://api.groq.com/openai/v1` (Groq has no Responses
-API). Without it, the agent keeps the default OpenAI behaviour unchanged, so both CLI and WhatsApp
+API). Without it, the agent keeps the default OpenAI behaviour unchanged, so both CLI and Telegram
 paths work with just `OPENAI_API_KEY`. The model wiring is covered by `groq_readiness_test.py`:
 its deterministic checks run offline, and a live Groq probe is gated on `GROQ_API_KEY` plus the
 Unix-only CLI (skipped on stock Windows and without a key).
@@ -128,12 +128,12 @@ call, so a single build can run against any data snapshot without re-installing.
 uv run pytest -q
 ```
 
-The campusgreen test suite is **287 tests: 271 pass, 16 skip** on this machine
-(~69 s), built in two honest tiers:
+The campusgreen test suite is **289 tests: 273 pass, 16 skip** on this machine
+(~10 s), built in two honest tiers:
 
-- **Tier 1 — deterministic (271 tests):** everything is testable without a key or
-  network — the real WhatsApp handler routing, the real seven tools, the real JSON
-  data layer, per-sender session isolation, the SPEC §13 lifecycle state machine,
+- **Tier 1 — deterministic (273 tests):** everything is testable without a key or
+  network — the real Telegram handler routing, the real seven tools, the real JSON
+  data layer, per-chat session isolation, the SPEC §13 lifecycle state machine,
   analytics, action planning, notification truthfulness, data-integrity,
   security/hygiene, the env-gated Groq model wiring, and an 11-step end-to-end
   competition scenario that finishes with a persisted-state audit. See
@@ -146,8 +146,8 @@ The campusgreen test suite is **287 tests: 271 pass, 16 skip** on this machine
   Windows), and are strictly skipped otherwise.
 
 All tests run against isolated copies of the data files (via `CAMPUSGREEN_DATA_DIR`
-and a re-seeded fixture), so the committed seed data is never mutated. The WhatsApp
-tests need no credentials and call neither Meta nor the OpenAI API. Full evidence,
+and a re-seeded fixture), so the committed seed data is never mutated. The Telegram
+tests need no credentials and call neither Telegram nor the OpenAI API. Full evidence,
 per-file coverage, and known limitations are in [`TEST_REPORT.md`](TEST_REPORT.md).
 
 ## Project Layout
@@ -155,13 +155,14 @@ per-file coverage, and known limitations are in [`TEST_REPORT.md`](TEST_REPORT.m
 - `agent.py` — the `campusgreen` agent definition and system instructions (tools bound via `OpenAIToolBuilder`).
 - `tool.py` — the seven Agent Kernel tools and the local JSON data layer.
 - `demo.py` — Agent Kernel CLI entry point that registers the agent.
-- `config.yaml` — Agent Kernel local configuration (in-memory sessions, logging, WhatsApp agent name).
+- `config.yaml` — Agent Kernel local configuration (in-memory sessions, logging, Telegram agent name).
 - `test-config.yaml` — Agent Kernel test harness configuration.
 - `demo_test.py` — deterministic tool/agent unit tests, conversational tests, and the tool-chaining integration test.
-- `server.py` — WhatsApp entry point (real Meta webhooks via `AgentWhatsAppRequestHandler`).
-- `integration_demo.py` — local WhatsApp demo (same routing, no Meta credentials).
-- `integration_test.py` — offline tests of the WhatsApp routing/session/error boundary and tool workflows.
-- `INTEGRATION.md` — how the WhatsApp integration is wired, run, and tested.
+- `server.py` — Telegram entry point (long polling by default, optional `--webhook`).
+- `integration_demo.py` — local Telegram demo (same routing, no Telegram credentials).
+- `integration_test.py` — offline tests of the Telegram routing/session/error boundary and tool workflows.
+- `telegram_handler.py` — `CampusGreenTelegramHandler` boundary shim over `AgentTelegramRequestHandler`.
+- `INTEGRATION.md` — how the Telegram integration is wired, run, and tested.
 - `tool_test.py` — 109-test unit matrix over all seven tools (incl. the lifecycle state machine).
 - `agent_behavior_test.py` — 21 deterministic agent-behavior tests (tools called, truthfulness, isolation).
 - `action_planning_test.py` — 18 Phase 8 action-planning tests (evidence-grounded plans, analysis-only behavior, explicit escalation, disk audits).
@@ -179,14 +180,15 @@ per-file coverage, and known limitations are in [`TEST_REPORT.md`](TEST_REPORT.m
 ## Scope of This Phase
 
 The core agent and tool architecture is implemented: seven tools, a local data layer, tool-chaining
-workflows, evidence-grounded action planning, the CLI-only demo, and a WhatsApp messaging
+workflows, evidence-grounded action planning, the CLI-only demo, and a Telegram messaging
 integration served through Agent Kernel's
-native `AgentWhatsAppRequestHandler`. **Phase 5 (reliability & competition readiness)** hardened the
+native `AgentTelegramRequestHandler`. **Phase 5 (reliability & competition readiness)** hardened the
 runtime — input coercion, SPEC §13 lifecycle enforcement, structured diagnostic logging, truthful
 failure reporting, refusal of override/injection attempts, and config validation — and packaged the
 whole thing as a runnable suite described in
 [`TEST_REPORT.md`](TEST_REPORT.md). **Phase 7** added the polished conversational flows (multi-turn
 clarification, topic reference resolution, courteous/out-of-scope handling). **Phase 8** added
 sustainability action planning (data-grounded prioritization, honest boundaries, explicit-action
-routing). Deployment, a web dashboard, analytics platforms, multi-agent
+routing). **Phase 9A** added env-gated Groq model support and migrated the messaging integration
+to Telegram. Deployment, a web dashboard, analytics platforms, multi-agent
 architecture, and advanced memory workflows are intentionally deferred to later phases.

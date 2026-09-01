@@ -1,7 +1,7 @@
-"""Phase 7 — polished user-flow scenarios through the real WhatsApp surface.
+"""Phase 7 — polished user-flow scenarios through the real Telegram surface.
 
 These replay whole conversations one realistic prompt at a time through the
-*actual* ``WhatsAppHandler`` pipeline (harness stand-in ``CampusGreenDriver``
+*actual* ``TelegramHandler`` pipeline (harness stand-in ``CampusGreenDriver``
 does the reasoning, the real tools and real persisted ``issues.json`` do the
 work). Each scenario asserts both the transcript the user saw **and** the state
 that was actually written to disk, so every claim in a reply is verifiable.

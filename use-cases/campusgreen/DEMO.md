@@ -8,8 +8,8 @@ the same seven tools (`tool.py`); only the channel boundary differs.
 | Surface | Command | Needs | Opens |
 | --- | --- | --- | --- |
 | CLI demo | `uv run python demo.py` | `OPENAI_API_KEY` + Unix `readline` (not stock Windows) | interactive CLI |
-| Local WhatsApp demo | `uv run python integration_demo.py` | `OPENAI_API_KEY` only | prints a scripted WhatsApp exchange |
-| Real WhatsApp server | `uv run python server.py` | Meta credentials + public HTTPS tunnel | WhatsApp webhooks |
+| Local Telegram demo | `uv run python integration_demo.py` | `OPENAI_API_KEY` (or `GROQ_API_KEY`) only | prints a scripted Telegram exchange |
+| Real Telegram server | `uv run python server.py` | `TELEGRAM_BOT_TOKEN` + `OPENAI_API_KEY` (or `GROQ_API_KEY`) | Telegram bot (long polling) |
 
 ## 1. CLI demo (`demo.py`)
 
@@ -37,39 +37,37 @@ agent prioritizing the recorded issues with evidence and only acting (escalating
 when explicitly asked.
 
 > **Windows note:** `agentkernel.cli` imports the Unix-only `readline` module, so the
-> CLI demo cannot start on stock Windows. Use the WhatsApp demo below — it exercises
+> CLI demo cannot start on stock Windows. Use the Telegram demo below — it exercises
 > the exact same agent and tools.
 
-## 2. Local WhatsApp demo (`integration_demo.py`) — no Meta needed
+## 2. Local Telegram demo (`integration_demo.py`) — no Telegram token needed
 
 ```bash
 cp .env.example .env        # Windows: copy .env.example .env
-# edit .env and set OPENAI_API_KEY
+# edit .env and set OPENAI_API_KEY (or GROQ_API_KEY)
 
 uv run python integration_demo.py
 ```
 
-Prints a scripted exchange exactly as a real WhatsApp user would see it: a student
-reports a leak (lookup → create → notify), the responsible team is picked up, a
+Prints a scripted exchange exactly as a real Telegram user would see it: a student
+sends `/start`, reports a leak (lookup → create → notify), the responsible team is picked up, a
 status question is answered from stored data, a worsening leak is escalated, a second
 sender's bins complaint runs in its own session, partial failures are reported
 truthfully, and — as the final turns — the agent produces an evidence-grounded
 action plan, explains its ranking, and escalates a ticket only when explicitly asked.
-Requires **no** Meta account and no tunnel; the only external service is the OpenAI
+Requires **no** Telegram bot token; the only external service is the LLM
 API.
 
-## 3. Real WhatsApp server (`server.py`)
+## 3. Real Telegram server (`server.py`)
 
 ```bash
-cp .env.example .env        # then fill in the Meta variables + OPENAI_API_KEY
+cp .env.example .env        # then fill in TELEGRAM_BOT_TOKEN + OPENAI_API_KEY / GROQ_API_KEY
 uv run python server.py
 ```
 
-Needs `AK_WHATSAPP__ACCESS_TOKEN`, `AK_WHATSAPP__PHONE_NUMBER_ID`,
-`AK_WHATSAPP__VERIFY_TOKEN` (+ optional `AK_WHATSAPP__APP_SECRET`) and a public
-HTTPS URL (e.g. an ngrok/pinggy tunnel) registered as the webhook with the
-`messages` field. Missing required variables produce a clear startup message naming
-only what's missing (never values), surfaced instead of a stack trace.
+Runs **long polling** against the Telegram Bot API by default (no ngrok, pinggy, or public HTTPS URL
+needed). To run as a webhook server mounted on the REST API instead: `uv run python server.py --webhook`.
+Missing required variables produce a clear startup message naming only what's missing (never values).
 
 See [`INTEGRATION.md`](INTEGRATION.md) for the full wiring and setup.
 
@@ -79,9 +77,12 @@ CampusGreen is built to feel like a single natural conversation, not a menu of
 one-shot commands. The same session carries context across turns: a follow-up
 continues the in-progress task, status questions resolve by topic, and courteous
 or out-of-scope messages are handled conversationally without unnecessary tool
-calls. An example, as a student would experience it on WhatsApp:
+calls. An example, as a student would experience it on Telegram:
 
 ```text
+Student: /start
+CampusGreen: 👋 Welcome to CampusGreen! I'm your campus sustainability assistant…
+
 Student: There is a leak.
 CampusGreen: I can help with that. Which campus building, room, or landmark is it near?
 Student: Near Lab 3.
@@ -137,8 +138,8 @@ git checkout -- data/issues.json
 
 ## 6. Channel and data-directory config
 
-With `CAMPUSGREEN_CHANNEL=whatsapp` and `CAMPUSGREEN_DATA_DIR` unset, issues created
-over WhatsApp are labelled `source_channel: whatsapp`. Set
+With `CAMPUSGREEN_CHANNEL=telegram` and `CAMPUSGREEN_DATA_DIR` unset, issues created
+over Telegram are labelled `source_channel: telegram`. Set
 `CAMPUSGREEN_CHANNEL=cli` (or unset it) to label issues `cli` for parity with the
 local demo.
 

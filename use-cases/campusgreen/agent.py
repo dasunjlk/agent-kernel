@@ -1,5 +1,12 @@
 import os
 
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass
+
 from agentkernel.openai import OpenAIToolBuilder
 from agents import Agent, OpenAIChatCompletionsModel
 from openai import AsyncOpenAI
@@ -156,9 +163,9 @@ RULES YOU MUST FOLLOW
   only what the tools actually show.
 - Give concise, useful responses.
 
-MESSAGING CHANNEL (WhatsApp)
+MESSAGING CHANNEL (Telegram)
 
-- You are reached through a one-to-one instant-messaging channel (WhatsApp). Each user has
+- You are reached through a one-to-one instant-messaging channel (Telegram). Each user has
   their own conversation session: treat every message as coming from that same campus user and
   keep their context in this session.
 - A follow-up such as "it is getting worse" or "the leak is spreading" refers to the most

@@ -1,7 +1,7 @@
 """Agent-behavior tests for CampusGreen.
 
 These drive ``CampusGreenDriver`` (the deterministic stand-in for the LLM) over
-the **real** CampusGreen tools exactly as the WhatsApp handler would: a prompt in,
+the **real** CampusGreen tools exactly as the Telegram handler would: a prompt in,
 a transcript out, with tool calls recorded so the assertions can verify *what the
 agent actually did* — which tools it called, with which arguments, and whether it
 reported successes and failures truthfully.

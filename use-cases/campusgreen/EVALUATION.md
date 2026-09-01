@@ -24,7 +24,7 @@ run on Windows 11 / Python 3.12.13 / agentkernel 0.8.1 — see
 | 14 | **Data & cross-file integrity** | Every reference resolves, every seed status is reachable from REPORTED, taxonomy matches the 7 categories, trend sentences cover all categories. | `data_integrity_test.py` (16 tests) |
 | 15 | **Security & hygiene** | No secrets in tracked files; `.env` ignored; `.env.example` placeholders empty for secrets; log lines never carry descriptions/keys; startup reports only missing-variable names. | `security_test.py::test_no_secrets_in_committed_source`, `test_env_file_is_ignored_and_untracked`, `test_env_example_contains_only_placeholders`, `test_success_log_lines_are_structured_and_sanitized`, `test_validate_config_reports_only_names`, `test_startup_exits_cleanly_without_config` |
 | 16 | **Performance smoke** | 200 sequential creates complete quickly and ID sequencing stays correct. | `tool_test.py::test_many_creates_complete_quickly` |
-| 17 | **Full competition journey (Tier-1, real WhatsApp handler)** | The 11-step scenario end-to-end, finishing with a persisted-state audit on disk. | `e2e_scenario_test.py` |
+| 17 | **Full competition journey (Tier-1, real Telegram handler)** | The 11-step scenario end-to-end, finishing with a persisted-state audit on disk. | `e2e_scenario_test.py` |
 | 18 | **LLM truthfulness & injection (Tier-2, gated)** | A real OpenAI-backed agent reports status failures without fabrication, asks for missing info, and refuses prompt-injection / false-notification instructions. | `demo_test.py` conversational tests (11, require `OPENAI_API_KEY` + CLI); `security_test.py::test_llm_refuses_prompt_injection`, `test_llm_wont_claim_false_notification` |
 
 ## Phase 7 — polished user flows

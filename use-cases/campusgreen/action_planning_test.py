@@ -1,7 +1,7 @@
 """Phase 8 — action-planning tests for CampusGreen.
 
 These drive ``CampusGreenDriver`` (the deterministic stand-in for the LLM's
-reasoning) over the **real** CampusGreen tools, exactly as the WhatsApp handler
+reasoning) over the **real** CampusGreen tools, exactly as the Telegram handler
 would. They verify the sustainability action-planning feature end to end:
 
 - Plans are grounded in the recorded data (``get_sustainability_report`` counts

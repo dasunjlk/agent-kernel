@@ -1,7 +1,7 @@
 """End-to-end competition scenario for CampusGreen.
 
 This is the closest thing to the real product experience that runs offline: a
-single WhatsApp sender walks through the full journey against the **real** tools
+single Telegram sender walks through the full journey against the **real** tools
 and real persisted data, with the deterministic agent stand-in doing the
 reasoning. After every step the test asserts both the transcript the user saw
 and the state actually written to ``issues.json``, so nothing in the reply is

@@ -1,7 +1,7 @@
 """Phase 7 — polished conversational-flow tests for CampusGreen.
 
 These drive ``CampusGreenDriver`` (the deterministic stand-in for the LLM's
-reasoning) over the **real** CampusGreen tools, exactly as the WhatsApp handler
+reasoning) over the **real** CampusGreen tools, exactly as the Telegram handler
 would: a prompt in, a transcript out. Where useful they spy on tool calls to
 assert *what the agent actually did* — which tools ran, with what arguments, and
 that no tool ran when none was needed.

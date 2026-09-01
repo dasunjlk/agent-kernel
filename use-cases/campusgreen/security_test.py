@@ -294,17 +294,19 @@ def test_error_log_line_has_error_code_without_values(isolated_store, caplog):
 
 
 def test_validate_config_reports_only_names():
-    from server import REQUIRED_ENV_VARS, validate_config
+    from server import validate_config
 
-    complete = {name: "set" for name in REQUIRED_ENV_VARS}
+    complete = {"TELEGRAM_BOT_TOKEN": "secret-telegram-token", "OPENAI_API_KEY": "sk-openai-key"}
     assert validate_config(complete) == []
 
-    partial = {"OPENAI_API_KEY": "sk-abc", "AK_WHATSAPP__APP_SECRET": "whs_xyz"}
+    complete_groq = {"AK_TELEGRAM__BOT_TOKEN": "secret-telegram-token", "GROQ_API_KEY": "gsk-groq-key"}
+    assert validate_config(complete_groq) == []
+
+    partial = {"OPENAI_API_KEY": "sk-abc"}
     missing = validate_config(partial)
-    assert set(missing) == set(REQUIRED_ENV_VARS) - {"OPENAI_API_KEY"}
-    assert all(name in REQUIRED_ENV_VARS for name in missing)
+    assert missing == ["TELEGRAM_BOT_TOKEN"]
     for name, value in partial.items():
-        assert not any(value in name for name in missing), "values must never leak into the report"
+        assert not any(value in item for item in missing), "values must never leak into the report"
 
 
 def test_startup_exits_cleanly_without_config(monkeypatch):
