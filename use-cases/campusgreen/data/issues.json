@@ -474,6 +474,16 @@
       "notification_type": "update",
       "delivered": true,
       "delivered_at": "2026-09-01T14:58:38Z"
+    },
+    {
+      "notification_id": "NOT-6097C3E2",
+      "team_id": "team_facilities_zone_a",
+      "team_name": "Facilities Zone A",
+      "issue_id": "WTR-008",
+      "message": "WTR-008 (tap leak, Main Library Zone A, 1st-floor washrooms) is still REPORTED and has worsened per the reporter \u2014 the leak is spreading further. Current priority HIGH. Please inspect and address soon. \u2014 CampusGreen",
+      "notification_type": "update",
+      "delivered": true,
+      "delivered_at": "2026-09-01T15:20:05Z"
     }
   ]
 }

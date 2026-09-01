@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from typing import Any
 
 import httpx
@@ -177,3 +178,88 @@ class CampusGreenTelegramHandler(AgentTelegramRequestHandler):
 
                 if once:
                     break
+
+    # ------------------------------------------------------------------
+    # Markdown → Telegram HTML formatting
+    # ------------------------------------------------------------------
+
+    async def _send_message(self, chat_id: int, text: str, parse_mode: str = None, reply_markup: dict = None):
+        """Override to auto-convert Markdown in agent replies to Telegram HTML.
+
+        When no explicit parse_mode is requested and the text contains Markdown
+        formatting characters, convert to HTML before sending. Falls back to
+        plain text if the Telegram API rejects the HTML.
+        """
+        if parse_mode is None and _looks_like_markdown(text):
+            html_text = _markdown_to_telegram_html(text)
+            try:
+                return await super()._send_message(chat_id, html_text, parse_mode="HTML", reply_markup=reply_markup)
+            except Exception:
+                self._log.warning("HTML send failed, falling back to plain text")
+                # Fall through to plain text send below
+
+        return await super()._send_message(chat_id, text, parse_mode=parse_mode, reply_markup=reply_markup)
+
+
+def _looks_like_markdown(text: str) -> bool:
+    """Quick check whether text contains Markdown formatting worth converting."""
+    return bool(re.search(r"\*\*|__|\*[^*]+\*|`|~~|^[ \t]*- ", text, re.MULTILINE))
+
+
+def _escape_html(text: str) -> str:
+    """Escape HTML special characters in text (but not inside tags we generate)."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _markdown_to_telegram_html(text: str) -> str:
+    """Convert common Markdown formatting to Telegram-compatible HTML.
+
+    Handles: **bold**, *italic*, `inline code`, ```code blocks```,
+    and Markdown bullet lists (- item).
+    """
+    # Step 1: Extract code blocks and inline code to protect them from further processing
+    placeholders: list[str] = []
+
+    def _save_code_block(m: re.Match) -> str:
+        # Remove optional language hint on first line
+        code = m.group(1)
+        lines = code.split("\n")
+        if lines and lines[0].strip() and not any(c in lines[0] for c in " \t=({"):
+            lines = lines[1:]
+        content = _escape_html("\n".join(lines).strip())
+        placeholders.append(f"<pre>{content}</pre>")
+        return f"\x00PLACEHOLDER{len(placeholders) - 1}\x00"
+
+    def _save_inline_code(m: re.Match) -> str:
+        content = _escape_html(m.group(1))
+        placeholders.append(f"<code>{content}</code>")
+        return f"\x00PLACEHOLDER{len(placeholders) - 1}\x00"
+
+    # Fenced code blocks: ```...```
+    result = re.sub(r"```(?:\w*\n)?(.*?)```", _save_code_block, text, flags=re.DOTALL)
+    # Inline code: `...`
+    result = re.sub(r"`([^`]+)`", _save_inline_code, result)
+
+    # Step 2: Escape remaining HTML special characters
+    result = _escape_html(result)
+
+    # Step 3: Apply formatting conversions
+    # Bold: **text** or __text__
+    result = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", result)
+    result = re.sub(r"__(.+?)__", r"<b>\1</b>", result)
+    # Italic: *text* or _text_ (but not inside words with underscores)
+    result = re.sub(r"(?<!\w)\*([^*]+?)\*(?!\w)", r"<i>\1</i>", result)
+    result = re.sub(r"(?<!\w)_([^_]+?)_(?!\w)", r"<i>\1</i>", result)
+    # Strikethrough: ~~text~~
+    result = re.sub(r"~~(.+?)~~", r"<s>\1</s>", result)
+
+    # Step 4: Convert Markdown bullet lists (- item) to • item
+    result = re.sub(r"(?m)^[ \t]*[-*][ \t]+", "• ", result)
+
+    # Step 5: Restore code placeholders
+    for i, placeholder in enumerate(placeholders):
+        result = result.replace(f"\x00PLACEHOLDER{i}\x00", placeholder)
+
+    return result.strip()
+
+
