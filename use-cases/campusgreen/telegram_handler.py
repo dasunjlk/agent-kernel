@@ -159,7 +159,7 @@ class CampusGreenTelegramHandler(AgentTelegramRequestHandler):
             await self._cmd_dashboard(chat_id)
         elif cmd == "/categories":
             await self._cmd_categories(chat_id)
-        elif cmd == "/tips":
+        elif cmd in ("/tips", "/tip"):
             await self._cmd_tips(chat_id)
         elif cmd == "/feedback":
             await self._cmd_feedback(chat_id, args)
