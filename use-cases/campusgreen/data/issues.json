@@ -506,6 +506,27 @@
           "note": "Initial report created from the user's message."
         }
       ]
+    },
+    {
+      "issue_id": "WTR-010",
+      "category": "WATER",
+      "location_id": "loc_library_f2_quiet",
+      "location_display_name": "Library Floor 2 Quiet Zone",
+      "description": "Massive water leak in the Library Floor 2 Quiet Zone bathroom",
+      "priority": "CRITICAL",
+      "status": "REPORTED",
+      "assigned_team_id": "team_facilities_zone_a",
+      "reported_by": "student",
+      "source_channel": "telegram",
+      "created_at": "2026-09-02T10:52:48Z",
+      "updated_at": "2026-09-02T10:52:48Z",
+      "history": [
+        {
+          "timestamp": "2026-09-02T10:52:48Z",
+          "event": "created",
+          "note": "Initial report created from the user's message."
+        }
+      ]
     }
   ],
   "notifications": [
@@ -628,6 +649,16 @@
       "notification_type": "update",
       "delivered": true,
       "delivered_at": "2026-09-02T06:22:49Z"
+    },
+    {
+      "notification_id": "NOT-7CF63B42",
+      "team_id": "team_facilities_zone_a",
+      "team_name": "Facilities Zone A",
+      "issue_id": "WTR-010",
+      "message": "WATER issue WTR-010: Massive water leak in the Library Floor 2 Quiet Zone bathroom",
+      "notification_type": "update",
+      "delivered": true,
+      "delivered_at": "2026-09-02T10:53:20Z"
     }
   ]
 }
