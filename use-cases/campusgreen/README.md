@@ -13,7 +13,7 @@ notified unless a tool actually did it.
 
 - Python 3.12 or newer.
 - `uv` for dependency management.
-- An OpenAI API key (`OPENAI_API_KEY`) for local CLI conversation.
+- An OpenAI API key (`OPENAI_API_KEY`) for local CLI conversation. We highly recommend using `openai/gpt-oss-20b` (or a compatible provider offering it) because it provides better performance and reliability for tool calling.
 
 ## Setup
 
@@ -46,6 +46,16 @@ its seeded state, restore the file with `git checkout -- data/issues.json`.
 
 CampusGreen is also reachable over Telegram. The same agent and tools back both the CLI demo and
 the Telegram server — only the channel boundary differs.
+
+### Available Telegram Commands
+- `/start` — Welcome message and introduction
+- `/help` — Show help and available commands
+- `/status <issue_id>` — Check the status of a specific issue
+- `/myissues` — List all issues reported by you
+- `/dashboard` — Sustainability summary & open issues
+- `/categories` — List available reporting categories
+- `/tips` — Get actionable sustainability tips
+- `/feedback <message>` — Send feedback about the bot
 
 - **Run it locally with no Telegram credentials** (just `OPENAI_API_KEY` or `GROQ_API_KEY`):
 

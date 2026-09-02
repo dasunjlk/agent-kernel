@@ -159,7 +159,7 @@ class CampusGreenTelegramHandler(AgentTelegramRequestHandler):
             await self._cmd_dashboard(chat_id)
         elif cmd == "/categories":
             await self._cmd_categories(chat_id)
-        elif cmd == "/tips":
+        elif cmd in ("/tips", "/tip"):
             await self._cmd_tips(chat_id)
         elif cmd == "/feedback":
             await self._cmd_feedback(chat_id, args)
@@ -347,7 +347,17 @@ class CampusGreenTelegramHandler(AgentTelegramRequestHandler):
 
     async def _cmd_tips(self, chat_id: int) -> None:
         """Handle /tips — send a random sustainability tip."""
-        tip = random.choice(SUSTAINABILITY_TIPS)
+        import secrets
+        
+        # Keep track of last sent tip to avoid repeats
+        if not hasattr(self, "_last_tip"):
+            self._last_tip = ""
+            
+        tip = secrets.choice(SUSTAINABILITY_TIPS)
+        while tip == self._last_tip and len(SUSTAINABILITY_TIPS) > 1:
+            tip = secrets.choice(SUSTAINABILITY_TIPS)
+            
+        self._last_tip = tip
         await self._send_message(chat_id, f"🌿 <b>Sustainability Tip</b>\n\n{tip}", parse_mode="HTML")
 
     async def _cmd_feedback(self, chat_id: int, args: str) -> None:

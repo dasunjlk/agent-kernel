@@ -2,7 +2,7 @@
 
 ## 1. Project Overview
 
-CampusGreen is a university sustainability coordinator built with Agent Kernel. It receives natural-language campus sustainability reports, classifies and prioritizes them, creates trackable issues, notifies the responsible team, remembers issue state across follow-up messages, and produces simple sustainability insights from recorded incidents.
+CampusGreen is a university sustainability coordinator built with Agent Kernel. It receives natural-language campus sustainability reports, classifies and prioritizes them, creates trackable issues, notifies the responsible team, remembers issue state across follow-up messages, and produces simple sustainability insights from recorded incidents. We highly recommend using `openai/gpt-oss-20b` (or a compatible provider offering it) because it provides better performance and reliability for tool calling.
 
 Full name: CampusGreen - University Sustainability Coordinator.
 
@@ -788,8 +788,16 @@ native `AgentTelegramRequestHandler`.
   mount on `RESTAPI.run` with `--webhook`. It routes each message into the `campusgreen` agent with
   `session_id = chat_id` (per-chat session isolation), and the agent's reply is sent back through
   Telegram. The shim (`telegram_handler.py`) normalizes incoming text (strips whitespace, ignores
-  empty/whitespace-only messages), handles `/start` and `/help`, and skips duplicate platform events
-  by update and message ID before delegating to the native handler.
+  empty/whitespace-only messages), skips duplicate platform events by update and message ID,
+  and handles the following custom Telegram slash commands before delegating to the native handler:
+  - `/start` — Welcome message
+  - `/help` — Help message
+  - `/status <id>` — Issue status lookup
+  - `/myissues` — User's reported issues
+  - `/dashboard` — Sustainability summary
+  - `/categories` — Reporting categories
+  - `/tips` — Sustainability tips
+  - `/feedback <msg>` — Bot feedback
 - `integration_demo.py` reuses the identical routing but overrides the handler's `_send_message`
   to print locally, so the complete agentic workflow is demonstrable with **no Telegram credentials**
   and no public tunnel; `OPENAI_API_KEY` (or `GROQ_API_KEY`) is the only external dependency.
