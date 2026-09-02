@@ -53,14 +53,14 @@ message and delegates everything else:
   (`duplicate_update_skipped` / `duplicate_message_skipped`), so a redelivered
   event is not reprocessed into a second ticket. This is a simple per-process
   guard keyed by platform event ID.
-- **/start command.** Introduces CampusGreen and outlines what the user can do
-  (report issues, check status, request action plans) without invoking the agent.
+- **Custom commands.** Introduces CampusGreen and outlines what the user can do
+  without invoking the agent. Handled commands include `/start`, `/help`, `/status`, `/myissues`, `/dashboard`, `/categories`, `/tips`, and `/feedback`.
 
 ## Files
 
 | File | Role |
 | --- | --- |
-| `telegram_handler.py` | `CampusGreenTelegramHandler` — the thin CampusGreen boundary shim over `AgentTelegramRequestHandler`. Normalizes text, handles `/start` and `/help`, skips duplicate events by update/message ID, and provides `poll()` for local long polling. |
+| `telegram_handler.py` | `CampusGreenTelegramHandler` — the thin CampusGreen boundary shim over `AgentTelegramRequestHandler`. Normalizes text, handles all custom slash commands (e.g. `/start`, `/dashboard`, `/status`), skips duplicate events by update/message ID, and provides `poll()` for local long polling. |
 | `server.py` | Telegram entry point. Runs long polling by default (`uv run python server.py`) or starts the REST webhook server (`--webhook`). Validates `TELEGRAM_BOT_TOKEN`. |
 | `integration_demo.py` | Local demo driver. Subclasses `CampusGreenTelegramHandler` and overrides `_send_message` to print replies locally, so it exercises the **same** routing and boundary logic with **no** Telegram credentials. Only needs `OPENAI_API_KEY` (or `GROQ_API_KEY`). |
 | `integration_test.py` | Deterministic pytest suite for the routing/session/error boundary, the shim's normalization + duplicate-event handling, `/start` behavior, and the tool workflows end to end. Uses an isolated copy of the seed data and never calls Telegram or OpenAI. |
