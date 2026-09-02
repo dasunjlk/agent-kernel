@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 import re
 from typing import Any
 
@@ -42,16 +43,52 @@ START_MESSAGE = (
     "👋 Welcome to CampusGreen! I'm your campus sustainability assistant.\n\n"
     "You can report sustainability issues (such as water leaks, energy waste, or bin overflow), "
     "check the status of existing tickets, or request sustainability action plans.\n\n"
-    "How can I help you today?"
+    "Type /help to see all available commands, or just send a message describing your issue!"
 )
 
 HELP_MESSAGE = (
-    "CampusGreen Sustainability Assistant\n\n"
-    "Available commands:\n"
-    "/start - Introduce CampusGreen and show capabilities\n"
-    "/help  - Show this help message\n\n"
-    "Or send any text message describing an issue or asking a question."
+    "🌿 <b>CampusGreen Sustainability Assistant</b>\n\n"
+    "<b>Commands:</b>\n"
+    "/start — Welcome message\n"
+    "/help — Show this help\n"
+    "/status <code>&lt;ID&gt;</code> — Check issue status (e.g. <code>/status WTR-001</code>)\n"
+    "/myissues — List all issues you reported\n"
+    "/dashboard — Sustainability summary & open issues\n"
+    "/categories — Show all issue categories\n"
+    "/tips — Get a sustainability tip\n"
+    "/feedback <code>&lt;ID&gt; &lt;message&gt;</code> — Add a note to an issue\n\n"
+    "Or just send any text message describing an issue or asking a question."
 )
+
+SUSTAINABILITY_TIPS = [
+    "💧 Report dripping taps immediately — a single drip can waste over 11,000 litres a year!",
+    "💡 Switch off lights and monitors when you leave a room. It takes just a second!",
+    "♻️ Use the correct recycling bins — contamination means the whole bin goes to landfill.",
+    "🚶 Walk or cycle to campus when you can. Short car trips have a disproportionate carbon impact.",
+    "🌡️ If a room feels too hot or cold, report it instead of opening windows while heating is on.",
+    "🍽️ Bring a reusable container to the café — reduce single-use packaging waste on campus.",
+    "🔌 Unplug chargers when not in use. They still draw power even when nothing is connected.",
+    "📦 Flatten cardboard boxes before recycling — it saves space and helps collection teams.",
+    "🚰 Carry a refillable water bottle. Campus water fountains are free and reduce plastic waste.",
+    "🌳 Respect green spaces — don't litter, and report any damage to plants or trees.",
+    "🧪 Dispose of lab chemicals properly — never pour them down the drain.",
+    "📱 Use CampusGreen to report issues! The faster we know, the faster we fix.",
+    "🏢 Close fume-hood sashes when not in use — open sashes waste huge amounts of energy.",
+    "🖨️ Print double-sided and only when you really need a hard copy.",
+    "🌍 Join a campus sustainability group — collective action has the biggest impact!",
+]
+
+CATEGORY_DESCRIPTIONS = {
+    "WATER": "💧 Leaks, flooding, dripping taps, irrigation issues",
+    "ENERGY": "💡 Wasted electricity, faulty lighting, HVAC problems",
+    "WASTE": "🗑️ Overflowing bins, improper disposal, recycling issues",
+    "FOOD": "🍽️ Food waste, unsafe storage, cafeteria hygiene",
+    "POLLUTION": "🏭 Air quality, noise, chemical spills, odours",
+    "INFRASTRUCTURE": "🏗️ Broken fixtures, damaged paths, facility maintenance",
+    "OTHER": "📋 Anything that doesn't fit the above categories",
+}
+
+_PRIORITY_EMOJI = {"CRITICAL": "🔴", "HIGH": "🟠", "MEDIUM": "🟡", "LOW": "🟢"}
 
 
 class CampusGreenTelegramHandler(AgentTelegramRequestHandler):
@@ -106,12 +143,264 @@ class CampusGreenTelegramHandler(AgentTelegramRequestHandler):
 
     async def _handle_command(self, chat_id: int, command: str) -> None:
         self._log.debug(f"Processing command: {command}")
-        if command == "/start":
+        parts = command.strip().split(None, 1)
+        cmd = parts[0].lower().split("@")[0]  # strip @botname suffix
+        args = parts[1].strip() if len(parts) > 1 else ""
+
+        if cmd == "/start":
             await self._send_message(chat_id, START_MESSAGE)
-        elif command == "/help":
-            await self._send_message(chat_id, HELP_MESSAGE)
+        elif cmd == "/help":
+            await self._send_message(chat_id, HELP_MESSAGE, parse_mode="HTML")
+        elif cmd == "/status":
+            await self._cmd_status(chat_id, args)
+        elif cmd == "/myissues":
+            await self._cmd_myissues(chat_id)
+        elif cmd == "/dashboard":
+            await self._cmd_dashboard(chat_id)
+        elif cmd == "/categories":
+            await self._cmd_categories(chat_id)
+        elif cmd == "/tips":
+            await self._cmd_tips(chat_id)
+        elif cmd == "/feedback":
+            await self._cmd_feedback(chat_id, args)
         else:
             await self._process_agent_message(chat_id, command)
+
+    # ------------------------------------------------------------------
+    # Slash command handlers
+    # ------------------------------------------------------------------
+
+    async def _cmd_status(self, chat_id: int, args: str) -> None:
+        """Handle /status <issue_id>."""
+        from tool import _issue_store, _present_issue, _validate_issue_id
+
+        if not args:
+            await self._send_message(
+                chat_id,
+                "⚠️ Please provide an issue ID.\nExample: <code>/status WTR-001</code>",
+                parse_mode="HTML",
+            )
+            return
+
+        issue_id = _validate_issue_id(args)
+        if issue_id is None:
+            await self._send_message(
+                chat_id,
+                f"⚠️ <code>{_escape_html(args)}</code> is not a valid issue ID.\nExpected format: <code>WTR-001</code>",
+                parse_mode="HTML",
+            )
+            return
+
+        issue = _issue_store().get(issue_id)
+        if issue is None:
+            await self._send_message(chat_id, f"❌ No issue found with ID <code>{issue_id}</code>.", parse_mode="HTML")
+            return
+
+        presented = _present_issue(issue)
+        emoji = _PRIORITY_EMOJI.get(presented["priority"], "⚪")
+        lines = [
+            f"📋 <b>Issue {presented['issue_id']}</b>",
+            "",
+            f"<b>Category:</b> {presented['category']}",
+            f"<b>Location:</b> {_escape_html(presented['location'])}",
+            f"<b>Priority:</b> {emoji} {presented['priority']}",
+            f"<b>Status:</b> {presented['status']}",
+            f"<b>Team:</b> {_escape_html(presented['assigned_team'])}",
+            f"<b>Reported by:</b> {_escape_html(presented['reported_by'])}",
+            f"<b>Created:</b> {presented['created_at']}",
+            f"<b>Updated:</b> {presented['updated_at']}",
+            "",
+            f"<b>Description:</b> {_escape_html(presented['description'])}",
+        ]
+        if presented.get("history"):
+            lines.append("")
+            lines.append("<b>History:</b>")
+            for entry in presented["history"][-5:]:
+                lines.append(f"  • [{entry.get('timestamp', '')}] {entry.get('event', '')}: {_escape_html(entry.get('note', ''))}")
+
+        await self._send_message(chat_id, "\n".join(lines), parse_mode="HTML")
+
+    async def _cmd_myissues(self, chat_id: int) -> None:
+        """Handle /myissues — list issues reported by this Telegram user."""
+        from tool import _issue_store, _location_by_id
+
+        user_id = str(chat_id)
+        all_issues = _issue_store().all()
+        my_issues = [
+            issue for issue in all_issues
+            if str(issue.get("reported_by", "")) == user_id
+            or str(issue.get("source_channel", "")) == "telegram"
+        ]
+
+        if not my_issues:
+            await self._send_message(chat_id, "📭 You haven't reported any issues yet.\nJust send me a message describing a problem and I'll create a ticket!")
+            return
+
+        # Sort by most recent first
+        my_issues.sort(key=lambda i: i.get("created_at", ""), reverse=True)
+
+        lines = [f"📋 <b>Your Issues ({len(my_issues)})</b>", ""]
+        for issue in my_issues[:15]:
+            emoji = _PRIORITY_EMOJI.get(str(issue.get("priority", "")), "⚪")
+            status = issue.get("status", "")
+            loc = issue.get("location_display_name", "")
+            if not loc:
+                location = _location_by_id(issue.get("location_id", ""))
+                loc = location["display_name"] if location else issue.get("location_id", "")
+            lines.append(
+                f"{emoji} <code>{issue['issue_id']}</code> | {status} | {_escape_html(loc)}\n"
+                f"    {_escape_html(issue.get('description', '')[:80])}"
+            )
+            lines.append("")
+
+        if len(my_issues) > 15:
+            lines.append(f"<i>...and {len(my_issues) - 15} more</i>")
+
+        lines.append("\nUse /status <code>&lt;ID&gt;</code> to see full details.")
+        await self._send_message(chat_id, "\n".join(lines), parse_mode="HTML")
+
+    async def _cmd_dashboard(self, chat_id: int) -> None:
+        """Handle /dashboard — sustainability summary."""
+        from tool import CATEGORIES, _issue_store, _location_by_id
+
+        all_issues = _issue_store().all()
+        total = len(all_issues)
+        open_issues = [i for i in all_issues if str(i.get("status", "")).upper() not in ("RESOLVED", "CLOSED")]
+        open_count = len(open_issues)
+        resolved_count = total - open_count
+
+        # Counts by category
+        cat_counts: dict[str, int] = {cat: 0 for cat in CATEGORIES}
+        for issue in open_issues:
+            cat = issue.get("category", "")
+            if cat in cat_counts:
+                cat_counts[cat] += 1
+
+        # Counts by priority
+        priority_counts: dict[str, int] = {}
+        for issue in open_issues:
+            p = str(issue.get("priority", "")).upper()
+            if p:
+                priority_counts[p] = priority_counts.get(p, 0) + 1
+
+        # Top locations with most open issues
+        loc_counts: dict[str, int] = {}
+        for issue in open_issues:
+            lid = issue.get("location_id", "")
+            if lid:
+                loc_counts[lid] = loc_counts.get(lid, 0) + 1
+        top_locations = sorted(loc_counts.items(), key=lambda kv: -kv[1])[:5]
+
+        lines = [
+            "📊 <b>CampusGreen Dashboard</b>",
+            "",
+            f"<b>Total Issues:</b> {total}",
+            f"<b>Open:</b> {open_count}  |  <b>Resolved/Closed:</b> {resolved_count}",
+            "",
+            "<b>Open Issues by Category:</b>",
+        ]
+        for cat in CATEGORIES:
+            count = cat_counts.get(cat, 0)
+            if count > 0:
+                bar = "█" * min(count, 10)
+                lines.append(f"  {cat}: {bar} {count}")
+
+        if priority_counts:
+            lines.append("")
+            lines.append("<b>Open Issues by Priority:</b>")
+            for p in ["CRITICAL", "HIGH", "MEDIUM", "LOW"]:
+                c = priority_counts.get(p, 0)
+                if c > 0:
+                    lines.append(f"  {_PRIORITY_EMOJI.get(p, '⚪')} {p}: {c}")
+
+        if top_locations:
+            lines.append("")
+            lines.append("<b>Top Locations (open issues):</b>")
+            for lid, count in top_locations:
+                location = _location_by_id(lid)
+                name = location["display_name"] if location else lid
+                lines.append(f"  📍 {_escape_html(name)}: {count}")
+
+        # Recent activity (last 5 issues)
+        recent = sorted(all_issues, key=lambda i: i.get("created_at", ""), reverse=True)[:5]
+        if recent:
+            lines.append("")
+            lines.append("<b>Recent Activity:</b>")
+            for issue in recent:
+                emoji = _PRIORITY_EMOJI.get(str(issue.get("priority", "")), "⚪")
+                lines.append(
+                    f"  {emoji} <code>{issue['issue_id']}</code> {issue.get('status', '')} — "
+                    f"{_escape_html(issue.get('description', '')[:50])}"
+                )
+
+        await self._send_message(chat_id, "\n".join(lines), parse_mode="HTML")
+
+    async def _cmd_categories(self, chat_id: int) -> None:
+        """Handle /categories — show all issue categories."""
+        lines = ["🏷️ <b>Issue Categories</b>", ""]
+        for cat, desc in CATEGORY_DESCRIPTIONS.items():
+            lines.append(f"<b>{cat}</b>")
+            lines.append(f"  {desc}")
+            lines.append("")
+        lines.append("To report an issue, just describe it in a message and I'll categorize it for you!")
+        await self._send_message(chat_id, "\n".join(lines), parse_mode="HTML")
+
+    async def _cmd_tips(self, chat_id: int) -> None:
+        """Handle /tips — send a random sustainability tip."""
+        tip = random.choice(SUSTAINABILITY_TIPS)
+        await self._send_message(chat_id, f"🌿 <b>Sustainability Tip</b>\n\n{tip}", parse_mode="HTML")
+
+    async def _cmd_feedback(self, chat_id: int, args: str) -> None:
+        """Handle /feedback <issue_id> <message>."""
+        from tool import _issue_store, _validate_issue_id
+
+        if not args:
+            await self._send_message(
+                chat_id,
+                "⚠️ Please provide an issue ID and your feedback.\nExample: <code>/feedback WTR-001 Water is still leaking</code>",
+                parse_mode="HTML",
+            )
+            return
+
+        parts = args.split(None, 1)
+        raw_id = parts[0]
+        note_text = parts[1].strip() if len(parts) > 1 else ""
+
+        issue_id = _validate_issue_id(raw_id)
+        if issue_id is None:
+            await self._send_message(
+                chat_id,
+                f"⚠️ <code>{_escape_html(raw_id)}</code> is not a valid issue ID.\nExpected format: <code>WTR-001</code>",
+                parse_mode="HTML",
+            )
+            return
+
+        if not note_text:
+            await self._send_message(
+                chat_id,
+                f"⚠️ Please include a message after the issue ID.\nExample: <code>/feedback {issue_id} Water is still leaking</code>",
+                parse_mode="HTML",
+            )
+            return
+
+        store = _issue_store()
+        issue = store.get(issue_id)
+        if issue is None:
+            await self._send_message(chat_id, f"❌ No issue found with ID <code>{issue_id}</code>.", parse_mode="HTML")
+            return
+
+        updated = store.update(issue_id, additional_note=f"[Telegram feedback] {note_text}")
+        if updated is None:
+            await self._send_message(chat_id, "❌ Failed to add feedback. Please try again.")
+            return
+
+        await self._send_message(
+            chat_id,
+            f"✅ Feedback added to <code>{issue_id}</code>\n\n"
+            f"<b>Your note:</b> {_escape_html(note_text)}\n"
+            f"<b>Issue status:</b> {updated.get('status', '')}",
+            parse_mode="HTML",
+        )
 
     async def _handle_message(self, message: dict, *args: Any, **kwargs: Any) -> None:
         message_id = message.get("message_id")

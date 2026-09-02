@@ -460,8 +460,6 @@ def create_issue(
     description: str,
     location_id: str,
     priority: str,
-    reported_by: str | None = "",
-    source_channel: str | None = "cli",
 ) -> dict:
     """Create a new sustainability issue record.
 
@@ -470,10 +468,6 @@ def create_issue(
     The tool generates the issue ID (e.g. WTR-001) itself. Returns a success
     envelope with the created issue (lifecycle status under ``issue["status"]``)
     or an error. Only claim a ticket was created when this returns ok.
-
-    ``reported_by`` defaults to the acting user when the channel provides one,
-    otherwise to "student". ``source_channel`` defaults to the configured
-    CampusGreen channel (``CAMPUSGREEN_CHANNEL`` or ``cli``).
     """
     normalized_category = _coerce_str(category).strip().upper()
     if normalized_category not in CATEGORIES:
@@ -496,8 +490,8 @@ def create_issue(
     if not text:
         return _error("missing_description", "A non-empty issue description is required.")
 
-    reporter = _coerce_str(reported_by).strip() or _acting_user() or "student"
-    channel = _coerce_str(source_channel).strip() or _channel()
+    reporter = _acting_user() or "student"
+    channel = _channel()
 
     store = _issue_store()
     now = _utcnow()
@@ -560,7 +554,7 @@ def _created_timestamp(issue: dict[str, Any]) -> float:
 
 
 @_logged
-def search_issues(category: str | None = "", status: str | None = "", location_id: str | None = "", limit: int | None = 20) -> dict:
+def search_issues(category: str = "", status: str = "", location_id: str = "", limit: int = 20) -> dict:
     """List recorded issues matching optional filters (no ranking opinion).
 
     Use when you need to inspect the actual issue records behind a question:
@@ -572,6 +566,9 @@ def search_issues(category: str | None = "", status: str | None = "", location_i
     "OPEN" means not RESOLVED or CLOSED; any other value must be an exact
     lifecycle status. Returns a success envelope with count, total_matches,
     and the issues list, or an error for invalid filters.
+
+    IMPORTANT: You MUST provide all parameters in the JSON call. If you are not filtering
+    by category, status, or location_id, pass an empty string "" for those parameters.
     """
     lowered_category = None
     if _coerce_str(category).strip():
@@ -645,10 +642,10 @@ def search_issues(category: str | None = "", status: str | None = "", location_i
 @_logged
 def update_issue(
     issue_id: str,
-    priority: str | None = None,
-    status: str | None = None,
-    additional_note: str | None = None,
-    resolution_note: str | None = None,
+    priority: str = "",
+    status: str = "",
+    additional_note: str = "",
+    resolution_note: str = "",
 ) -> dict:
     """Update an existing issue (priority, status, or notes).
 
@@ -659,13 +656,16 @@ def update_issue(
     state diagram (for example CLOSED is terminal); invalid moves are rejected
     with an invalid_transition error. Returns the updated issue state only when
     the update succeeded; never claim an update or escalation without this ok.
+
+    IMPORTANT: You MUST provide all parameters in the JSON call. If you are not updating
+    priority, status, additional_note, or resolution_note, pass an empty string "" for them.
     """
     normalized = _validate_issue_id(issue_id)
     if normalized is None:
         return _error("invalid_issue_id", f"'{issue_id}' is not a valid issue ID (expected e.g. WTR-001).")
 
     normalized_priority = None
-    if priority is not None:
+    if priority is not None and _coerce_str(priority).strip():
         normalized_priority = _coerce_str(priority).strip().upper()
         if normalized_priority not in PRIORITIES:
             return _error(
@@ -673,7 +673,7 @@ def update_issue(
             )
 
     normalized_status = None
-    if status is not None:
+    if status is not None and _coerce_str(status).strip():
         normalized_status = _coerce_str(status).strip().upper()
         if normalized_status not in STATUSES:
             return _error("invalid_status", f"Unknown status '{status}'. Allowed statuses: {', '.join(STATUSES)}.")
@@ -733,8 +733,8 @@ def update_issue(
 def notify_team(
     team_id: str,
     issue_id: str,
-    message: str | None = "",
-    notification_type: str | None = "update",
+    message: str = "",
+    notification_type: str = "update",
 ) -> dict:
     """Notify a campus team about an issue via the local mock channel.
 
@@ -742,6 +742,9 @@ def notify_team(
     Requires a known team ID and an existing issue ID. Returns a success
     envelope with a notification_id and delivered=True only when delivery was
     recorded. Never claim a team was notified without this ok result.
+
+    IMPORTANT: You MUST provide all parameters in the JSON call. Always include 
+    'message' (pass "" if none) and 'notification_type' (pass "update" if none).
     """
     team = _team_by_id(_coerce_str(team_id))
     if team is None:
@@ -807,7 +810,7 @@ def _compiled_trends(top_category: str | None, top_count: int) -> list[str]:
 
 @_logged
 def get_sustainability_report(
-    period: str = "month", category: str | None = None, location_id: str | None = None
+    period: str = "month", category: str = "", location_id: str = ""
 ) -> dict:
     """Summarize recorded sustainability issues for a requested period.
 
@@ -816,20 +819,23 @@ def get_sustainability_report(
     recorded issues (never invented). Optional ``category`` and ``location_id``
     narrow the computation. Returns a success envelope with category and
     priority counts, the open issue count, top locations, and notable trends.
+
+    IMPORTANT: You MUST provide all parameters in the JSON call. If you are not filtering
+    by category or location_id, pass an empty string "" for those parameters.
     """
     period_key = _coerce_str(period).strip().lower() or "month"
     if period_key not in PERIODS:
         return _error("invalid_period", f"Unknown period '{period}'. Allowed periods: {', '.join(PERIODS)}.")
 
     normalized_category = None
-    if category is not None:
+    if category is not None and _coerce_str(category).strip():
         normalized_category = _coerce_str(category).strip().upper()
         if normalized_category not in CATEGORIES:
             return _error(
                 "invalid_category", f"Unknown category '{category}'. Allowed categories: {', '.join(CATEGORIES)}."
             )
 
-    if location_id is not None and _location_by_id(_coerce_str(location_id)) is None:
+    if location_id is not None and _coerce_str(location_id).strip() and _location_by_id(_coerce_str(location_id)) is None:
         return _error("unknown_location_id", f"No campus location matches location_id '{location_id}'.")
 
     issues = _issue_store().all()
@@ -838,7 +844,7 @@ def get_sustainability_report(
         issues = [item for item in issues if (item.get("created_at") or "") >= cutoff]
     if normalized_category is not None:
         issues = [item for item in issues if item.get("category") == normalized_category]
-    if location_id is not None:
+    if location_id is not None and _coerce_str(location_id).strip():
         needle = _coerce_str(location_id).strip().lower()
         issues = [item for item in issues if str(item.get("location_id", "")).lower() == needle]
 

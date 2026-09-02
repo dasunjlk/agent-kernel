@@ -5,18 +5,28 @@
       "category": "WATER",
       "location_id": "loc_lab_3",
       "description": "Water leak outside Lab 3",
-      "priority": "HIGH",
+      "priority": "CRITICAL",
       "status": "REPORTED",
       "assigned_team_id": "team_facilities_zone_b",
       "reported_by": "seed-demo",
       "source_channel": "cli",
       "created_at": "2026-08-05T09:15:00Z",
-      "updated_at": "2026-08-05T09:15:00Z",
+      "updated_at": "2026-09-02T06:08:34Z",
       "history": [
         {
           "timestamp": "2026-08-05T09:15:00Z",
           "event": "created",
           "note": "Initial report seeded for the prototype demo."
+        },
+        {
+          "timestamp": "2026-09-02T05:53:35Z",
+          "event": "updated",
+          "note": "priority: HIGH -> CRITICAL"
+        },
+        {
+          "timestamp": "2026-09-02T06:08:34Z",
+          "event": "updated",
+          "note": "[Telegram feedback] Water is still leaking"
         }
       ]
     },
@@ -412,6 +422,90 @@
           "note": "The tap leak is worsening and spreading further."
         }
       ]
+    },
+    {
+      "issue_id": "WTR-009",
+      "category": "WATER",
+      "location_id": "loc_main_library",
+      "location_display_name": "Main Library",
+      "description": "Water leak in the library 1st floor wash room (Zone A).",
+      "priority": "HIGH",
+      "status": "REPORTED",
+      "assigned_team_id": "team_facilities_zone_a",
+      "reported_by": "student",
+      "source_channel": "telegram",
+      "created_at": "2026-09-02T05:36:25Z",
+      "updated_at": "2026-09-02T05:36:25Z",
+      "history": [
+        {
+          "timestamp": "2026-09-02T05:36:25Z",
+          "event": "created",
+          "note": "Initial report created from the user's message."
+        }
+      ]
+    },
+    {
+      "issue_id": "WST-005",
+      "category": "WASTE",
+      "location_id": "loc_lab_3",
+      "location_display_name": "Lab 3",
+      "description": "Bin in Lab 3 is overflowing.",
+      "priority": "MEDIUM",
+      "status": "REPORTED",
+      "assigned_team_id": "team_facilities_zone_b",
+      "reported_by": "student",
+      "source_channel": "cli",
+      "created_at": "2026-09-02T06:12:30Z",
+      "updated_at": "2026-09-02T06:12:30Z",
+      "history": [
+        {
+          "timestamp": "2026-09-02T06:12:30Z",
+          "event": "created",
+          "note": "Initial report created from the user's message."
+        }
+      ]
+    },
+    {
+      "issue_id": "WST-006",
+      "category": "WASTE",
+      "location_id": "loc_lab_3",
+      "location_display_name": "Lab 3",
+      "description": "Bin in Lab 3 is overflowing, causing potential hygiene issues.",
+      "priority": "MEDIUM",
+      "status": "REPORTED",
+      "assigned_team_id": "team_facilities_zone_b",
+      "reported_by": "student",
+      "source_channel": "telegram",
+      "created_at": "2026-09-02T06:20:33Z",
+      "updated_at": "2026-09-02T06:20:33Z",
+      "history": [
+        {
+          "timestamp": "2026-09-02T06:20:33Z",
+          "event": "created",
+          "note": "Initial report created from the user's message."
+        }
+      ]
+    },
+    {
+      "issue_id": "WST-007",
+      "category": "WASTE",
+      "location_id": "loc_lab_3",
+      "location_display_name": "Lab 3",
+      "description": "The bin in Lab 3 is overflowing.",
+      "priority": "MEDIUM",
+      "status": "REPORTED",
+      "assigned_team_id": "team_facilities_zone_b",
+      "reported_by": "student",
+      "source_channel": "telegram",
+      "created_at": "2026-09-02T06:22:43Z",
+      "updated_at": "2026-09-02T06:22:43Z",
+      "history": [
+        {
+          "timestamp": "2026-09-02T06:22:43Z",
+          "event": "created",
+          "note": "Initial report created from the user's message."
+        }
+      ]
     }
   ],
   "notifications": [
@@ -484,6 +578,56 @@
       "notification_type": "update",
       "delivered": true,
       "delivered_at": "2026-09-01T15:20:05Z"
+    },
+    {
+      "notification_id": "NOT-5B2ED801",
+      "team_id": "team_facilities_zone_a",
+      "team_name": "Facilities Zone A",
+      "issue_id": "WTR-009",
+      "message": "[12:00] HIGH priority WATER leak reported in the Main Library, 1st floor wash room (Zone A), ticket WTR-009. Please investigate.",
+      "notification_type": "update",
+      "delivered": true,
+      "delivered_at": "2026-09-02T05:37:44Z"
+    },
+    {
+      "notification_id": "NOT-635EC066",
+      "team_id": "team_facilities_zone_b",
+      "team_name": "Facilities Zone B",
+      "issue_id": "WTR-001",
+      "message": "WATER issue WTR-001: Water leak outside Lab 3",
+      "notification_type": "update",
+      "delivered": true,
+      "delivered_at": "2026-09-02T05:54:04Z"
+    },
+    {
+      "notification_id": "NOT-3020E722",
+      "team_id": "team_facilities_zone_b",
+      "team_name": "Facilities Zone B",
+      "issue_id": "WST-005",
+      "message": "Bin overflowing in Lab 3",
+      "notification_type": "new_issue",
+      "delivered": true,
+      "delivered_at": "2026-09-02T06:13:09Z"
+    },
+    {
+      "notification_id": "NOT-BC25184F",
+      "team_id": "team_facilities_zone_b",
+      "team_name": "Facilities Zone B",
+      "issue_id": "WST-006",
+      "message": "WASTE issue WST-006: Bin in Lab 3 is overflowing, causing potential hygiene issues.",
+      "notification_type": "update",
+      "delivered": true,
+      "delivered_at": "2026-09-02T06:21:02Z"
+    },
+    {
+      "notification_id": "NOT-5F45D74E",
+      "team_id": "team_facilities_zone_b",
+      "team_name": "Facilities Zone B",
+      "issue_id": "WST-007",
+      "message": "WASTE issue WST-007: The bin in Lab 3 is overflowing.",
+      "notification_type": "update",
+      "delivered": true,
+      "delivered_at": "2026-09-02T06:22:49Z"
     }
   ]
 }
