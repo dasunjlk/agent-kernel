@@ -40,5 +40,19 @@
     "responsibility": "Solar array, electrical systems, and energy efficiency",
     "zone": "Campus-wide",
     "contact_channel": "mock://energy-utilities"
+  },
+  {
+    "team_id": "team_facilities_zone_d",
+    "name": "Facilities Zone D",
+    "responsibility": "Dorms, residential maintenance, plumbing in Zone D",
+    "zone": "Zone D",
+    "contact_channel": "mock://facilities-zone-d"
+  },
+  {
+    "team_id": "team_cleaning",
+    "name": "Cleaning & Janitorial",
+    "responsibility": "Washroom cleaning, trash removal, hygiene",
+    "zone": "Campus-wide",
+    "contact_channel": "mock://cleaning"
   }
 ]

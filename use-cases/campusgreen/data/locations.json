@@ -5,7 +5,11 @@
     "building": "Engineering Block",
     "floor": "2",
     "zone": "Zone B",
-    "aliases": ["lab three", "engineering lab 3", "computer lab 3"],
+    "aliases": [
+      "lab three",
+      "engineering lab 3",
+      "computer lab 3"
+    ],
     "responsible_team_id": "team_facilities_zone_b"
   },
   {
@@ -14,7 +18,10 @@
     "building": "Engineering Block",
     "floor": "2",
     "zone": "Zone B",
-    "aliases": ["lab four", "engineering lab 4"],
+    "aliases": [
+      "lab four",
+      "engineering lab 4"
+    ],
     "responsible_team_id": "team_facilities_zone_b"
   },
   {
@@ -23,7 +30,10 @@
     "building": "Library Building",
     "floor": "1",
     "zone": "Zone A",
-    "aliases": ["library", "main library building"],
+    "aliases": [
+      "library",
+      "main library building"
+    ],
     "responsible_team_id": "team_facilities_zone_a"
   },
   {
@@ -32,7 +42,11 @@
     "building": "Student Centre",
     "floor": "1",
     "zone": "Zone A",
-    "aliases": ["cafe", "cafeteria", "student centre cafe"],
+    "aliases": [
+      "cafe",
+      "cafeteria",
+      "student centre cafe"
+    ],
     "responsible_team_id": "team_catering"
   },
   {
@@ -41,7 +55,10 @@
     "building": "Outdoor",
     "floor": "Ground",
     "zone": "Zone C",
-    "aliases": ["east walk", "walkway east"],
+    "aliases": [
+      "east walk",
+      "walkway east"
+    ],
     "responsible_team_id": "team_grounds"
   },
   {
@@ -50,7 +67,10 @@
     "building": "Outdoor",
     "floor": "Ground",
     "zone": "Zone A",
-    "aliases": ["plaza", "main plaza"],
+    "aliases": [
+      "plaza",
+      "main plaza"
+    ],
     "responsible_team_id": "team_grounds"
   },
   {
@@ -59,7 +79,10 @@
     "building": "Science Building",
     "floor": "3",
     "zone": "Zone B",
-    "aliases": ["physics", "science building physics wing"],
+    "aliases": [
+      "physics",
+      "science building physics wing"
+    ],
     "responsible_team_id": "team_facilities_zone_b"
   },
   {
@@ -68,7 +91,10 @@
     "building": "Sports Complex",
     "floor": "1",
     "zone": "Zone C",
-    "aliases": ["gym", "sports gym"],
+    "aliases": [
+      "gym",
+      "sports gym"
+    ],
     "responsible_team_id": "team_facilities_zone_c"
   },
   {
@@ -77,7 +103,10 @@
     "building": "Maintenance Yard",
     "floor": "Roof",
     "zone": "Zone C",
-    "aliases": ["solar panels", "solar field"],
+    "aliases": [
+      "solar panels",
+      "solar field"
+    ],
     "responsible_team_id": "team_energy"
   },
   {
@@ -86,7 +115,10 @@
     "building": "Services Building",
     "floor": "1",
     "zone": "Zone A",
-    "aliases": ["clinic", "medical centre"],
+    "aliases": [
+      "clinic",
+      "medical centre"
+    ],
     "responsible_team_id": "team_facilities_zone_a"
   },
   {
@@ -96,6 +128,452 @@
     "floor": "Ground",
     "zone": "Zone D",
     "aliases": [],
+    "responsible_team_id": "team_grounds"
+  },
+  {
+    "location_id": "loc_science_f1_washroom",
+    "display_name": "Science Bldg Floor 1 Washroom",
+    "building": "Science Building",
+    "floor": "1",
+    "zone": "Zone C",
+    "aliases": [
+      "science washroom 1",
+      "first floor science bathroom"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_science_f2_washroom",
+    "display_name": "Science Bldg Floor 2 Washroom",
+    "building": "Science Building",
+    "floor": "2",
+    "zone": "Zone C",
+    "aliases": [
+      "science washroom 2",
+      "second floor science bathroom"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_dorm_a_f1",
+    "display_name": "Dormitory A Floor 1",
+    "building": "Dormitory A",
+    "floor": "1",
+    "zone": "Zone D",
+    "aliases": [
+      "dorm A first floor",
+      "dorm A ground"
+    ],
+    "responsible_team_id": "team_facilities_zone_d"
+  },
+  {
+    "location_id": "loc_dorm_a_washroom",
+    "display_name": "Dormitory A Washroom",
+    "building": "Dormitory A",
+    "floor": "1",
+    "zone": "Zone D",
+    "aliases": [
+      "dorm A bathroom",
+      "dormitory A washroom"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_admin_ground",
+    "display_name": "Admin Block Ground Floor",
+    "building": "Admin Block",
+    "floor": "G",
+    "zone": "Zone A",
+    "aliases": [
+      "admin ground",
+      "admin reception",
+      "main admin floor"
+    ],
+    "responsible_team_id": "team_facilities_zone_a"
+  },
+  {
+    "location_id": "loc_admin_washroom",
+    "display_name": "Admin Block Washroom",
+    "building": "Admin Block",
+    "floor": "G",
+    "zone": "Zone A",
+    "aliases": [
+      "admin bathroom",
+      "admin toilets"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_science_f1_lab",
+    "display_name": "Science Bldg Floor 1 Lab",
+    "building": "Science Building",
+    "floor": "1",
+    "zone": "Zone C",
+    "aliases": [
+      "science lab 1",
+      "biology lab"
+    ],
+    "responsible_team_id": "team_facilities_zone_c"
+  },
+  {
+    "location_id": "loc_science_f2_class",
+    "display_name": "Science Bldg Floor 2 Classroom",
+    "building": "Science Building",
+    "floor": "2",
+    "zone": "Zone C",
+    "aliases": [
+      "science classroom 2",
+      "chemistry class"
+    ],
+    "responsible_team_id": "team_facilities_zone_c"
+  },
+  {
+    "location_id": "loc_science_f3_washroom",
+    "display_name": "Science Bldg Floor 3 Washroom",
+    "building": "Science Building",
+    "floor": "3",
+    "zone": "Zone C",
+    "aliases": [
+      "science washroom 3",
+      "third floor science bathroom"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_science_f3_office",
+    "display_name": "Science Bldg Floor 3 Staff Office",
+    "building": "Science Building",
+    "floor": "3",
+    "zone": "Zone C",
+    "aliases": [
+      "science staff office",
+      "science faculty office"
+    ],
+    "responsible_team_id": "team_facilities_zone_c"
+  },
+  {
+    "location_id": "loc_admin_f1_office",
+    "display_name": "Admin Block Floor 1 Offices",
+    "building": "Admin Block",
+    "floor": "1",
+    "zone": "Zone A",
+    "aliases": [
+      "admin offices 1",
+      "first floor admin"
+    ],
+    "responsible_team_id": "team_facilities_zone_a"
+  },
+  {
+    "location_id": "loc_admin_f1_washroom",
+    "display_name": "Admin Block Floor 1 Washroom",
+    "building": "Admin Block",
+    "floor": "1",
+    "zone": "Zone A",
+    "aliases": [
+      "admin floor 1 bathroom"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_admin_f2_boardroom",
+    "display_name": "Admin Block Floor 2 Boardroom",
+    "building": "Admin Block",
+    "floor": "2",
+    "zone": "Zone A",
+    "aliases": [
+      "admin boardroom",
+      "executive meeting room"
+    ],
+    "responsible_team_id": "team_facilities_zone_a"
+  },
+  {
+    "location_id": "loc_admin_f2_washroom",
+    "display_name": "Admin Block Floor 2 Washroom",
+    "building": "Admin Block",
+    "floor": "2",
+    "zone": "Zone A",
+    "aliases": [
+      "admin floor 2 bathroom"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_dorm_a_f2",
+    "display_name": "Dormitory A Floor 2",
+    "building": "Dormitory A",
+    "floor": "2",
+    "zone": "Zone D",
+    "aliases": [
+      "dorm A second floor"
+    ],
+    "responsible_team_id": "team_facilities_zone_d"
+  },
+  {
+    "location_id": "loc_dorm_a_f2_washroom",
+    "display_name": "Dormitory A Floor 2 Washroom",
+    "building": "Dormitory A",
+    "floor": "2",
+    "zone": "Zone D",
+    "aliases": [
+      "dorm A second floor bathroom"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_dorm_a_f3",
+    "display_name": "Dormitory A Floor 3",
+    "building": "Dormitory A",
+    "floor": "3",
+    "zone": "Zone D",
+    "aliases": [
+      "dorm A third floor"
+    ],
+    "responsible_team_id": "team_facilities_zone_d"
+  },
+  {
+    "location_id": "loc_dorm_a_f3_washroom",
+    "display_name": "Dormitory A Floor 3 Washroom",
+    "building": "Dormitory A",
+    "floor": "3",
+    "zone": "Zone D",
+    "aliases": [
+      "dorm A third floor bathroom"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_dorm_a_lounge",
+    "display_name": "Dormitory A Common Lounge",
+    "building": "Dormitory A",
+    "floor": "G",
+    "zone": "Zone D",
+    "aliases": [
+      "dorm A lounge",
+      "dorm a common room"
+    ],
+    "responsible_team_id": "team_facilities_zone_d"
+  },
+  {
+    "location_id": "loc_dorm_b_f1",
+    "display_name": "Dormitory B Floor 1",
+    "building": "Dormitory B",
+    "floor": "1",
+    "zone": "Zone D",
+    "aliases": [
+      "dorm B first floor",
+      "dorm b ground"
+    ],
+    "responsible_team_id": "team_facilities_zone_d"
+  },
+  {
+    "location_id": "loc_dorm_b_f1_washroom",
+    "display_name": "Dormitory B Floor 1 Washroom",
+    "building": "Dormitory B",
+    "floor": "1",
+    "zone": "Zone D",
+    "aliases": [
+      "dorm B bathroom",
+      "dorm B first floor washroom"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_dorm_b_f2",
+    "display_name": "Dormitory B Floor 2",
+    "building": "Dormitory B",
+    "floor": "2",
+    "zone": "Zone D",
+    "aliases": [
+      "dorm B second floor"
+    ],
+    "responsible_team_id": "team_facilities_zone_d"
+  },
+  {
+    "location_id": "loc_dorm_b_f2_washroom",
+    "display_name": "Dormitory B Floor 2 Washroom",
+    "building": "Dormitory B",
+    "floor": "2",
+    "zone": "Zone D",
+    "aliases": [
+      "dorm B second floor bathroom"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_dorm_b_laundry",
+    "display_name": "Dormitory B Laundry Room",
+    "building": "Dormitory B",
+    "floor": "B",
+    "zone": "Zone D",
+    "aliases": [
+      "dorm B laundry",
+      "laundry room b"
+    ],
+    "responsible_team_id": "team_facilities_zone_d"
+  },
+  {
+    "location_id": "loc_student_f1_washroom",
+    "display_name": "Student Centre Floor 1 Washroom",
+    "building": "Student Centre",
+    "floor": "1",
+    "zone": "Zone A",
+    "aliases": [
+      "student centre bathroom 1",
+      "cafe washroom"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_student_f2_study",
+    "display_name": "Student Centre Floor 2 Study Hall",
+    "building": "Student Centre",
+    "floor": "2",
+    "zone": "Zone A",
+    "aliases": [
+      "study hall",
+      "student centre study room"
+    ],
+    "responsible_team_id": "team_facilities_zone_a"
+  },
+  {
+    "location_id": "loc_student_f2_washroom",
+    "display_name": "Student Centre Floor 2 Washroom",
+    "building": "Student Centre",
+    "floor": "2",
+    "zone": "Zone A",
+    "aliases": [
+      "student centre bathroom 2"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_eng_f1_washroom",
+    "display_name": "Engineering Block Floor 1 Washroom",
+    "building": "Engineering Block",
+    "floor": "1",
+    "zone": "Zone B",
+    "aliases": [
+      "engineering bathroom 1",
+      "eng floor 1 washroom"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_eng_f2_washroom",
+    "display_name": "Engineering Block Floor 2 Washroom",
+    "building": "Engineering Block",
+    "floor": "2",
+    "zone": "Zone B",
+    "aliases": [
+      "engineering bathroom 2",
+      "eng floor 2 washroom"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_eng_f3_lab",
+    "display_name": "Engineering Block Floor 3 Robotics Lab",
+    "building": "Engineering Block",
+    "floor": "3",
+    "zone": "Zone B",
+    "aliases": [
+      "robotics lab",
+      "engineering lab 5"
+    ],
+    "responsible_team_id": "team_facilities_zone_b"
+  },
+  {
+    "location_id": "loc_eng_f3_washroom",
+    "display_name": "Engineering Block Floor 3 Washroom",
+    "building": "Engineering Block",
+    "floor": "3",
+    "zone": "Zone B",
+    "aliases": [
+      "engineering bathroom 3",
+      "eng floor 3 washroom"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_library_f1_washroom",
+    "display_name": "Library Floor 1 Washroom",
+    "building": "Library Building",
+    "floor": "1",
+    "zone": "Zone A",
+    "aliases": [
+      "library bathroom 1"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_library_f2_quiet",
+    "display_name": "Library Floor 2 Quiet Zone",
+    "building": "Library Building",
+    "floor": "2",
+    "zone": "Zone A",
+    "aliases": [
+      "library second floor",
+      "quiet study zone"
+    ],
+    "responsible_team_id": "team_facilities_zone_a"
+  },
+  {
+    "location_id": "loc_library_f2_washroom",
+    "display_name": "Library Floor 2 Washroom",
+    "building": "Library Building",
+    "floor": "2",
+    "zone": "Zone A",
+    "aliases": [
+      "library bathroom 2"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_library_f3_archives",
+    "display_name": "Library Floor 3 Archives",
+    "building": "Library Building",
+    "floor": "3",
+    "zone": "Zone A",
+    "aliases": [
+      "library archives",
+      "library third floor"
+    ],
+    "responsible_team_id": "team_facilities_zone_a"
+  },
+  {
+    "location_id": "loc_library_f3_washroom",
+    "display_name": "Library Floor 3 Washroom",
+    "building": "Library Building",
+    "floor": "3",
+    "zone": "Zone A",
+    "aliases": [
+      "library bathroom 3"
+    ],
+    "responsible_team_id": "team_cleaning"
+  },
+  {
+    "location_id": "loc_north_parking",
+    "display_name": "North Parking Lot",
+    "building": "Outdoors",
+    "floor": "G",
+    "zone": "Campus-wide",
+    "aliases": [
+      "north parking",
+      "parking lot a"
+    ],
+    "responsible_team_id": "team_grounds"
+  },
+  {
+    "location_id": "loc_south_sports",
+    "display_name": "South Sports Field",
+    "building": "Outdoors",
+    "floor": "G",
+    "zone": "Campus-wide",
+    "aliases": [
+      "sports field",
+      "soccer field",
+      "south field"
+    ],
     "responsible_team_id": "team_grounds"
   }
 ]
