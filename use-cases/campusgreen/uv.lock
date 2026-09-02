@@ -43,6 +43,9 @@ openai = [
     { name = "openai-guardrails" },
     { name = "openinference-instrumentation-openai-agents" },
 ]
+telegram = [
+    { name = "httpx" },
+]
 test = [
     { name = "datasets" },
     { name = "langchain-community" },
@@ -55,9 +58,6 @@ test = [
     { name = "pytest-order" },
     { name = "ragas" },
     { name = "rapidfuzz" },
-]
-whatsapp = [
-    { name = "httpx" },
 ]
 
 [[package]]
@@ -392,7 +392,7 @@ name = "campusgreen"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "agentkernel", extra = ["api", "openai", "whatsapp"] },
+    { name = "agentkernel", extra = ["api", "openai", "telegram"] },
 ]
 
 [package.dev-dependencies]
@@ -402,10 +402,11 @@ dev = [
     { name = "isort" },
     { name = "mypy" },
     { name = "pytest" },
+    { name = "pytest-order" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "agentkernel", extras = ["cli", "openai", "whatsapp", "api"], specifier = ">=0.8.1" }]
+requires-dist = [{ name = "agentkernel", extras = ["cli", "openai", "telegram", "api"], specifier = ">=0.8.1" }]
 
 [package.metadata.requires-dev]
 dev = [
@@ -414,6 +415,7 @@ dev = [
     { name = "isort", specifier = ">=5.0.0" },
     { name = "mypy", specifier = ">=1.0.0" },
     { name = "pytest", specifier = ">=8.0.0" },
+    { name = "pytest-order", specifier = ">=1.1.0" },
 ]
 
 [[package]]

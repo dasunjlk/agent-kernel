@@ -4,13 +4,13 @@ session:
   cache:
     size: 256
 
-# WhatsApp messaging integration (used by server.py / integration_demo.py).
-# Credentials are read from the environment (AK_WHATSAPP__*); only the agent
-# name lives in this committed file.
-whatsapp:
+# Telegram messaging integration (used by server.py / integration_demo.py).
+# Credentials are read from the environment (TELEGRAM_BOT_TOKEN / AK_TELEGRAM__BOT_TOKEN);
+# only the agent name lives in this committed file.
+telegram:
   agent: "campusgreen"
 
-# REST API surface that hosts the WhatsApp webhook handler.
+# REST API surface that hosts the Telegram webhook handler.
 api:
   host: "0.0.0.0"
   port: 8000

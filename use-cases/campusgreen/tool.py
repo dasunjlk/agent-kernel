@@ -391,11 +391,16 @@ def lookup_campus_location(query: str) -> dict:
     responsible team) or a location_not_found error. Never invent a location
     when this tool says a place is unknown; ask the user instead.
     """
-    text = _coerce_str(query).strip()
+    if not isinstance(query, str):
+        return _error("location_not_found", f"Query must be a string; got {type(query).__name__}.")
+    text = query.strip()
     if not text:
         return _error("empty_query", "No location text was provided.")
     needle = text.lower()
-    for location in _load_json("locations.json"):
+    locations = _load_json("locations.json")
+
+    # Pass 1: exact match against display_name, location_id, or aliases
+    for location in locations:
         candidates = [str(location.get("display_name", "")), str(location.get("location_id", ""))]
         candidates.extend(str(alias) for alias in location.get("aliases") or [])
         if needle in {candidate.strip().lower() for candidate in candidates if candidate.strip()}:
@@ -413,6 +418,39 @@ def lookup_campus_location(query: str) -> dict:
                     "responsible_team": team["name"] if team else location.get("responsible_team_id", ""),
                 },
             }
+
+    # Pass 2: whole-word phrase match (e.g., "outside Lab 3" or "in Main Library restroom")
+    best_match = None
+    best_len = 0
+    for location in locations:
+        candidates = [str(location.get("display_name", "")), str(location.get("location_id", ""))]
+        candidates.extend(str(alias) for alias in location.get("aliases") or [])
+        for cand in candidates:
+            cand_clean = cand.strip().lower()
+            if not cand_clean or len(cand_clean) < 3:
+                continue
+            pattern = r"\b" + re.escape(cand_clean) + r"\b"
+            if re.search(pattern, needle):
+                if len(cand_clean) > best_len:
+                    best_len = len(cand_clean)
+                    best_match = location
+
+    if best_match is not None:
+        team = _team_by_id(best_match.get("responsible_team_id", ""))
+        return {
+            "status": "ok",
+            "location": {
+                "location_id": best_match["location_id"],
+                "display_name": best_match["display_name"],
+                "building": best_match.get("building", ""),
+                "floor": best_match.get("floor", ""),
+                "zone": best_match.get("zone", ""),
+                "aliases": best_match.get("aliases") or [],
+                "responsible_team_id": best_match.get("responsible_team_id", ""),
+                "responsible_team": team["name"] if team else best_match.get("responsible_team_id", ""),
+            },
+        }
+
     return _error("location_not_found", f"No known campus location matches '{text}'.")
 
 
@@ -422,8 +460,6 @@ def create_issue(
     description: str,
     location_id: str,
     priority: str,
-    reported_by: str = "",
-    source_channel: str = "cli",
 ) -> dict:
     """Create a new sustainability issue record.
 
@@ -432,10 +468,6 @@ def create_issue(
     The tool generates the issue ID (e.g. WTR-001) itself. Returns a success
     envelope with the created issue (lifecycle status under ``issue["status"]``)
     or an error. Only claim a ticket was created when this returns ok.
-
-    ``reported_by`` defaults to the acting user when the channel provides one,
-    otherwise to "student". ``source_channel`` defaults to the configured
-    CampusGreen channel (``CAMPUSGREEN_CHANNEL`` or ``cli``).
     """
     normalized_category = _coerce_str(category).strip().upper()
     if normalized_category not in CATEGORIES:
@@ -458,11 +490,25 @@ def create_issue(
     if not text:
         return _error("missing_description", "A non-empty issue description is required.")
 
-    reporter = _coerce_str(reported_by).strip() or _acting_user() or "student"
-    channel = _coerce_str(source_channel).strip() or _channel()
+    reporter = _acting_user() or "student"
+    channel = _channel()
 
     store = _issue_store()
     now = _utcnow()
+    
+    # Duplicate detection: check if there is an active issue for the same category and location
+    for existing in store.all():
+        if (
+            existing.get("category") == normalized_category
+            and existing.get("location_id") == location["location_id"]
+            and existing.get("status") not in ("RESOLVED", "CLOSED")
+        ):
+            return _error(
+                "duplicate_issue_exists",
+                f"An active issue ({existing['issue_id']}) already exists for this category and location. "
+                "Tell the user it's already reported, thank them, and optionally use update_issue to add their report as an additional note if it contains new details.",
+            )
+
     issue_id = store.next_issue_id(normalized_category)
     issue = {
         "issue_id": issue_id,
@@ -534,6 +580,9 @@ def search_issues(category: str = "", status: str = "", location_id: str = "", l
     "OPEN" means not RESOLVED or CLOSED; any other value must be an exact
     lifecycle status. Returns a success envelope with count, total_matches,
     and the issues list, or an error for invalid filters.
+
+    IMPORTANT: You MUST provide all parameters in the JSON call. If you are not filtering
+    by category, status, or location_id, pass an empty string "" for those parameters.
     """
     lowered_category = None
     if _coerce_str(category).strip():
@@ -607,10 +656,10 @@ def search_issues(category: str = "", status: str = "", location_id: str = "", l
 @_logged
 def update_issue(
     issue_id: str,
-    priority: str | None = None,
-    status: str | None = None,
-    additional_note: str | None = None,
-    resolution_note: str | None = None,
+    priority: str = "",
+    status: str = "",
+    additional_note: str = "",
+    resolution_note: str = "",
 ) -> dict:
     """Update an existing issue (priority, status, or notes).
 
@@ -621,13 +670,16 @@ def update_issue(
     state diagram (for example CLOSED is terminal); invalid moves are rejected
     with an invalid_transition error. Returns the updated issue state only when
     the update succeeded; never claim an update or escalation without this ok.
+
+    IMPORTANT: You MUST provide all parameters in the JSON call. If you are not updating
+    priority, status, additional_note, or resolution_note, pass an empty string "" for them.
     """
     normalized = _validate_issue_id(issue_id)
     if normalized is None:
         return _error("invalid_issue_id", f"'{issue_id}' is not a valid issue ID (expected e.g. WTR-001).")
 
     normalized_priority = None
-    if priority is not None:
+    if priority is not None and _coerce_str(priority).strip():
         normalized_priority = _coerce_str(priority).strip().upper()
         if normalized_priority not in PRIORITIES:
             return _error(
@@ -635,7 +687,7 @@ def update_issue(
             )
 
     normalized_status = None
-    if status is not None:
+    if status is not None and _coerce_str(status).strip():
         normalized_status = _coerce_str(status).strip().upper()
         if normalized_status not in STATUSES:
             return _error("invalid_status", f"Unknown status '{status}'. Allowed statuses: {', '.join(STATUSES)}.")
@@ -692,13 +744,21 @@ def update_issue(
 
 
 @_logged
-def notify_team(team_id: str, issue_id: str, message: str = "", notification_type: str = "update") -> dict:
+def notify_team(
+    team_id: str,
+    issue_id: str,
+    message: str = "",
+    notification_type: str = "update",
+) -> dict:
     """Notify a campus team about an issue via the local mock channel.
 
     Use after an issue is created or updated so the responsible team is told.
     Requires a known team ID and an existing issue ID. Returns a success
     envelope with a notification_id and delivered=True only when delivery was
     recorded. Never claim a team was notified without this ok result.
+
+    IMPORTANT: You MUST provide all parameters in the JSON call. Always include 
+    'message' (pass "" if none) and 'notification_type' (pass "update" if none).
     """
     team = _team_by_id(_coerce_str(team_id))
     if team is None:
@@ -764,7 +824,7 @@ def _compiled_trends(top_category: str | None, top_count: int) -> list[str]:
 
 @_logged
 def get_sustainability_report(
-    period: str = "month", category: str | None = None, location_id: str | None = None
+    period: str = "month", category: str = "", location_id: str = ""
 ) -> dict:
     """Summarize recorded sustainability issues for a requested period.
 
@@ -773,20 +833,23 @@ def get_sustainability_report(
     recorded issues (never invented). Optional ``category`` and ``location_id``
     narrow the computation. Returns a success envelope with category and
     priority counts, the open issue count, top locations, and notable trends.
+
+    IMPORTANT: You MUST provide all parameters in the JSON call. If you are not filtering
+    by category or location_id, pass an empty string "" for those parameters.
     """
     period_key = _coerce_str(period).strip().lower() or "month"
     if period_key not in PERIODS:
         return _error("invalid_period", f"Unknown period '{period}'. Allowed periods: {', '.join(PERIODS)}.")
 
     normalized_category = None
-    if category is not None:
+    if category is not None and _coerce_str(category).strip():
         normalized_category = _coerce_str(category).strip().upper()
         if normalized_category not in CATEGORIES:
             return _error(
                 "invalid_category", f"Unknown category '{category}'. Allowed categories: {', '.join(CATEGORIES)}."
             )
 
-    if location_id is not None and _location_by_id(_coerce_str(location_id)) is None:
+    if location_id is not None and _coerce_str(location_id).strip() and _location_by_id(_coerce_str(location_id)) is None:
         return _error("unknown_location_id", f"No campus location matches location_id '{location_id}'.")
 
     issues = _issue_store().all()
@@ -795,7 +858,7 @@ def get_sustainability_report(
         issues = [item for item in issues if (item.get("created_at") or "") >= cutoff]
     if normalized_category is not None:
         issues = [item for item in issues if item.get("category") == normalized_category]
-    if location_id is not None:
+    if location_id is not None and _coerce_str(location_id).strip():
         needle = _coerce_str(location_id).strip().lower()
         issues = [item for item in issues if str(item.get("location_id", "")).lower() == needle]
 

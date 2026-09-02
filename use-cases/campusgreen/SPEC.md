@@ -758,13 +758,13 @@ CampusGreen is channel-independent at the agent and tool layer.
 Required interfaces for the full MVP:
 
 - Local CLI or demo script for development and judging.
-- One Agent Kernel-supported messaging integration for user-facing operation, preferably WhatsApp if credentials are available, otherwise Slack.
+- One Agent Kernel-supported messaging integration for user-facing operation: Telegram.
 
 Preferred flow:
 
 ```text
 User
-  -> WhatsApp or Slack
+  -> Telegram
   -> Agent Kernel messaging integration
   -> CampusGreen agent
   -> CampusGreen tools
@@ -776,32 +776,30 @@ Implementation expectations:
 
 - The local demo and messaging integration must use the same agent and tool logic.
 - Messaging-specific parsing should stay at the channel boundary.
-- The core CampusGreen tools must not depend on WhatsApp or Slack-specific objects.
+- The core CampusGreen tools must not depend on Telegram-specific objects.
 - If messaging credentials are unavailable, the local demo must still show the complete agentic workflow.
 
-### Status (Phase 4)
+### Status (Phase 9A Update)
 
-WhatsApp is implemented as the user-facing messaging integration, served through Agent Kernel's
-native `AgentWhatsAppRequestHandler` (the same handler that backs the `ak-py` examples API).
+Telegram is implemented as the user-facing messaging integration, served through Agent Kernel's
+native `AgentTelegramRequestHandler`.
 
-- `server.py` mounts the handler (wrapped by CampusGreen's thin boundary shim,
-  `CampusGreenWhatsAppHandler` in `whatsapp_handler.py`) via `RESTAPI.run` and
-  serves real Meta webhooks at `/whatsapp/webhook`; the handler routes each
-  message into the `campusgreen` agent with `session_id = sender number`
-  (per-user session isolation), and the agent's reply is sent back through
-  WhatsApp. The shim normalizes incoming text (strips whitespace, ignores
-  empty/whitespace-only messages) and skips duplicate platform events by their
-  message ID before delegating to the native handler.
+- `server.py` runs long polling by default (`CampusGreenTelegramHandler.poll()`) and can optionally
+  mount on `RESTAPI.run` with `--webhook`. It routes each message into the `campusgreen` agent with
+  `session_id = chat_id` (per-chat session isolation), and the agent's reply is sent back through
+  Telegram. The shim (`telegram_handler.py`) normalizes incoming text (strips whitespace, ignores
+  empty/whitespace-only messages), handles `/start` and `/help`, and skips duplicate platform events
+  by update and message ID before delegating to the native handler.
 - `integration_demo.py` reuses the identical routing but overrides the handler's `_send_message`
-  to print locally, so the complete agentic workflow is demonstrable with **no Meta credentials**
-  and no public tunnel; an `OPENAI_API_KEY` is the only external dependency.
+  to print locally, so the complete agentic workflow is demonstrable with **no Telegram credentials**
+  and no public tunnel; `OPENAI_API_KEY` (or `GROQ_API_KEY`) is the only external dependency.
 - `integration_test.py` verifies the boundary offline: message routing, session isolation between
-  senders, reply delivery, missing-agent and runtime-error mapping, unsupported-message rejection,
+  senders, reply delivery, `/start` behavior, missing-agent and runtime-error mapping,
   and the full tool workflows (report, unknown location, status, escalation, truthful failure).
-- `config.yaml` sets `whatsapp.agent: "campusgreen"`; credentials are environment-driven
-  (`AK_WHATSAPP__*`). See `INTEGRATION.md` and `README.md` for setup and runtime details.
-- If Meta credentials are unavailable, the local CLI demo (`demo.py`) and the local
-  WhatsApp demo (`integration_demo.py`) both still show the complete workflow, satisfying the
+- `config.yaml` sets `telegram.agent: "campusgreen"`; credentials are environment-driven
+  (`TELEGRAM_BOT_TOKEN`). See `INTEGRATION.md` and `README.md` for setup and runtime details.
+- If Telegram credentials are unavailable, the local CLI demo (`demo.py`) and the local
+  Telegram demo (`integration_demo.py`) both still show the complete workflow, satisfying the
   last expectation above.
 
 ## 17. Error Handling
