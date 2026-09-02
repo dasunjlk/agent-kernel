@@ -462,7 +462,7 @@ class CampusGreenTelegramHandler(AgentTelegramRequestHandler):
                     self._log.info("Telegram polling cancelled.")
                     break
                 except Exception as e:
-                    self._log.error(f"Error during Telegram polling: {e}")
+                    self._log.exception("Error during Telegram polling:")
                     await asyncio.sleep(2)
 
                 if once:

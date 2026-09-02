@@ -42,6 +42,8 @@ except ImportError:
     pass
 
 
+
+
 def _sync_env(env: dict) -> None:
     """Ensure TELEGRAM_BOT_TOKEN and AK_TELEGRAM__BOT_TOKEN are synchronized."""
     token = (env.get("TELEGRAM_BOT_TOKEN") or env.get("AK_TELEGRAM__BOT_TOKEN") or "").strip()

@@ -495,6 +495,20 @@ def create_issue(
 
     store = _issue_store()
     now = _utcnow()
+    
+    # Duplicate detection: check if there is an active issue for the same category and location
+    for existing in store.all():
+        if (
+            existing.get("category") == normalized_category
+            and existing.get("location_id") == location["location_id"]
+            and existing.get("status") not in ("RESOLVED", "CLOSED")
+        ):
+            return _error(
+                "duplicate_issue_exists",
+                f"An active issue ({existing['issue_id']}) already exists for this category and location. "
+                "Tell the user it's already reported, thank them, and optionally use update_issue to add their report as an additional note if it contains new details.",
+            )
+
     issue_id = store.next_issue_id(normalized_category)
     issue = {
         "issue_id": issue_id,

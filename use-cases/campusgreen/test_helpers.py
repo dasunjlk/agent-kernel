@@ -730,7 +730,7 @@ class CampusGreenDriver(FakeAgentService):
         # Ordered before the notify/escalation branches so "force notify failure"
         # and friends are always treated as probes and never as real follow-ups.
         if "force notify failure" in lowered:
-            lookup = lookup_campus_location("Lab 3")
+            lookup = lookup_campus_location("East Walkway")
             created = create_issue(
                 category="WATER", description=prompt, location_id=lookup["location"]["location_id"], priority="HIGH"
             )
